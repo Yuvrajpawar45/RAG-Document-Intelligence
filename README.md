@@ -1,145 +1,160 @@
-# 📖 DocMind — RAG Document Intelligence
+# DocMind
 
-A production-grade Retrieval-Augmented Generation (RAG) system. Upload PDFs or paste text, then ask questions and get answers with full source citations.
+DocMind is a Retrieval-Augmented Generation (RAG) app for asking questions over PDFs or pasted text. It uses `sentence-transformers` for embeddings, `FAISS` for vector search, `FastAPI` for the backend, and `Streamlit` for the UI.
 
-**Built with:** sentence-transformers · FAISS · Groq Llama 3 (FREE) · FastAPI · Streamlit
+## Features
 
----
+- Upload a PDF and index it locally
+- Paste raw text and index it as a source
+- Ask natural-language questions over indexed content
+- Get answers with source citations
+- Keep the vector index on disk in the `data/` folder
 
-## 🏗 Architecture
+## Tech Stack
 
+- Frontend: `Streamlit`
+- Backend: `FastAPI` + `uvicorn`
+- Embeddings: `sentence-transformers/all-MiniLM-L6-v2`
+- Vector store: `FAISS`
+- LLM: `Groq`
+- PDF parsing: `PyMuPDF`
+
+## Project Structure
+
+```text
+rag-final/
+|-- app.py
+|-- backend/
+|   |-- __init__.py
+|   |-- api.py
+|   `-- rag_engine.py
+|-- data/
+|-- .env.example
+|-- requirements.txt
+`-- README.md
 ```
-User Question
-     │
-     ▼
-[ app.py ]  ──HTTP──►  [ FastAPI /query ]
-                                   │
-               ┌───────────────────┼────────────────────┐
-               ▼                   ▼                    ▼
-     Embed query (MiniLM)   FAISS top-K search   Groq Llama 3 generate
-               └───────────────────┴────────────────────┘
-                                   │
-                             Answer + Citations
-```
 
-| Component | Technology |
-|---|---|
-| Embeddings | `sentence-transformers` all-MiniLM-L6-v2 |
-| Vector Store | `FAISS` — local, no cloud needed |
-| LLM | Llama 3 8B via **Groq API (FREE)** |
-| Backend | `FastAPI` + `uvicorn` |
-| Frontend | Streamlit |
-| PDF Parsing | `PyMuPDF (fitz)` |
+## Prerequisites
 
----
+- Python 3.10 recommended
+- A Groq API key
 
-## 🚀 Setup (5 minutes)
+## Setup
 
-### 1. Install Python dependencies
-```bash
+1. Create and activate a virtual environment:
+
+```powershell
 python -m venv venv
-venv\Scripts\activate        # Windows
-# source venv/bin/activate   # Mac/Linux
+venv\Scripts\activate
+```
 
+2. Install dependencies:
+
+```powershell
 pip install -r requirements.txt
 ```
 
-### 2. Get FREE Groq API key
-1. Go to **https://console.groq.com**
-2. Sign up (no credit card required)
-3. Click **API Keys** → **Create API Key**
-4. Copy your key (starts with `gsk_...`)
+3. Create a `.env` file from the example:
 
-### 3. Create your `.env` file
-```bash
-# Copy the template
-copy .env.example .env     # Windows
-# cp .env.example .env     # Mac/Linux
-```
-Then open `.env` and paste your key:
-```
-GROQ_API_KEY=gsk_your_actual_key_here
+```powershell
+copy .env.example .env
 ```
 
-### 4. Start the backend (Terminal 1)
-```bash
+4. Add your Groq API key to `.env`:
+
+```env
+GROQ_API_KEY=your_groq_api_key_here
+DOCMIND_API_URL=http://localhost:8000
+```
+
+## Run the App
+
+Open two terminals in the project root.
+
+Terminal 1: start the backend
+
+```powershell
+venv\Scripts\activate
 uvicorn backend.api:app --reload --port 8000
 ```
-✅ You should see: `Uvicorn running on http://127.0.0.1:8000`
 
-### 5. Start the frontend (Terminal 2)
-Just **double-click** `frontend/index.html` in File Explorer — opens in your browser.
+Terminal 2: start the UI
 
-Or navigate to it manually in Chrome: `Ctrl+O` → select `frontend/index.html`
-
----
-
-## 💡 How to Use
-
-| Step | Action |
-|---|---|
-| 1 | Upload a PDF via the sidebar (drag & drop works too) |
-| 2 | OR paste any text → give it a name → click "Index Text" |
-| 3 | Wait for "X chunks ✓" confirmation |
-| 4 | Type your question in the chat box and press Enter |
-| 5 | Get answers with source citations! |
-
----
-
-## 📁 Project Structure
-
-```
-DocMind/
-├── backend/
-│   ├── __init__.py
-│   ├── rag_engine.py       # Chunking, FAISS indexing, retrieval, Groq generation
-│   └── api.py              # FastAPI REST endpoints
-├── frontend/
-│   └── index.html          # Complete UI (HTML + CSS + JS, single file)
-├── data/                   # Auto-created on first ingest
-│   ├── faiss.index         # Vector index (persists between runs)
-│   └── metadata.pkl        # Chunk metadata
-├── .env                    # Your API key (never commit this)
-├── .env.example            # Template
-├── .gitignore
-└── requirements.txt
+```powershell
+venv\Scripts\activate
+streamlit run app.py
 ```
 
----
+Open the UI at:
 
-## ⚙️ Configuration
+- `http://127.0.0.1:8501`
 
-In `backend/rag_engine.py` you can tune:
-```python
-EMBED_MODEL   = "all-MiniLM-L6-v2"  # swap for larger model for better quality
-GROQ_MODEL    = "llama3-8b-8192"     # or "mixtral-8x7b-32768" for longer context
-CHUNK_SIZE    = 500                  # characters per chunk (try 300–800)
-CHUNK_OVERLAP = 100                  # overlap to avoid missing context at boundaries
-TOP_K         = 5                    # how many chunks to retrieve per query
+API docs are available at:
+
+- `http://127.0.0.1:8000/docs`
+
+## Using a Different Backend Port
+
+If you want to run FastAPI on a different port, update `DOCMIND_API_URL` in `.env`.
+
+Example:
+
+```env
+DOCMIND_API_URL=http://localhost:8001
 ```
 
----
+Then start the backend on the matching port:
 
-## 🎯 Interview Talking Points
+```powershell
+uvicorn backend.api:app --reload --port 8001
+```
 
-1. **Chunking** — Sliding window with overlap prevents losing context at chunk boundaries
-2. **Embedding** — MiniLM is fast and CPU-friendly; can swap for `text-embedding-3-small` in production
-3. **FAISS choice** — Avoids cloud DB dependency; in production you'd use Pinecone or Weaviate
-4. **Conversation memory** — Last 6 turns sent as context to Groq for coherent multi-turn dialogue
-5. **Free LLM** — Groq gives 14,400 free requests/day; production would use a paid tier
-6. **Production path** — Add auth, containerize with Docker, replace FAISS with cloud vector DB
+## How to Use
 
----
+1. Open the Streamlit UI.
+2. Upload a PDF or paste text in the sidebar.
+3. Click `Index This PDF` or `Index Text`.
+4. Ask a question in the main chat area.
 
-## 🔄 API Endpoints
+Sample text to try:
 
-| Method | Endpoint | Description |
-|---|---|---|
-| GET | `/health` | Health check |
-| GET | `/stats` | Index stats (chunk count, sources) |
-| POST | `/ingest/pdf` | Upload & index a PDF |
-| POST | `/ingest/text` | Index raw text |
-| POST | `/query` | Ask a question |
-| DELETE | `/clear` | Clear entire index |
+```text
+DocMind is a retrieval-augmented generation demo. It uses sentence-transformers for embeddings, FAISS for vector search, and Groq for final answer generation. The system stores indexed chunks locally and can answer questions with source citations.
+```
 
-Interactive API docs: **http://localhost:8000/docs**
+Sample question:
+
+```text
+What does DocMind use for vector search?
+```
+
+## Notes
+
+- The first backend startup may download the embedding model from Hugging Face.
+- Indexed files and metadata are stored in `data/`.
+- If no document has been indexed yet, the app will prompt you to upload or paste content first.
+
+## API Endpoints
+
+- `GET /health`
+- `GET /stats`
+- `POST /ingest/pdf`
+- `POST /ingest/text`
+- `POST /query`
+- `DELETE /clear`
+
+## GitHub Push Checklist
+
+Before pushing:
+
+- Keep `.env` out of Git
+- Make sure `venv/` is ignored
+- Commit source files, `requirements.txt`, and `README.md`
+
+Example:
+
+```powershell
+git add app.py backend .env.example requirements.txt README.md .vscode/settings.json
+git commit -m "Make API URL configurable and refresh project docs"
+git push
+```
