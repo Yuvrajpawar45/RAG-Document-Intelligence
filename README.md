@@ -29,7 +29,6 @@ rag-final/
 |   |-- api.py
 |   `-- rag_engine.py
 |-- data/
-|-- .env.example
 |-- requirements.txt
 `-- README.md
 ```
@@ -54,13 +53,7 @@ venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-3. Create a `.env` file from the example:
-
-```powershell
-copy .env.example .env
-```
-
-4. Add your Groq API key to `.env`:
+3. Create a `.env` file in the project root with your Groq API key:
 
 ```env
 GROQ_API_KEY=your_groq_api_key_here
@@ -154,7 +147,7 @@ Before pushing:
 Example:
 
 ```powershell
-git add app.py backend .env.example requirements.txt README.md .vscode/settings.json
-git commit -m "Make API URL configurable and refresh project docs"
+git add app.py backend requirements.txt README.md .vscode/settings.json
+git commit -m "Remove env example from repo"
 git push
 ```
