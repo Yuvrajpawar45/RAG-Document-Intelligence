@@ -47,7 +47,7 @@ class RAGEngine:
 
         logger.info("Loading embedding model: %s", EMBED_MODEL)
         self.embedder = SentenceTransformer(EMBED_MODEL)
-        self.dim = self.embedder.get_embedding_dimension()
+        self.dim = self.embedder.get_sentence_embedding_dimension()
         self.client = Groq(api_key=api_key)
 
         # NOTE: Using IndexFlatIP (inner product) — correct for cosine similarity

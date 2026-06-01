@@ -2,6 +2,9 @@
 
 <div align="center">
 
+[![Typing SVG](https://readme-typing-svg.demolab.com?font=Fira+Code&weight=600&size=24&pause=900&color=2F80ED&center=true&vCenter=true&width=850&lines=Ask+questions+over+PDFs+with+cited+RAG+answers;FastAPI+%2B+Streamlit+%2B+FAISS+%2B+Groq;Portfolio-ready+document+intelligence+system)](https://git.io/typing-svg)
+
+[![Tests](https://github.com/Yuvrajpawar45/RAG-Document-Intelligence/actions/workflows/tests.yml/badge.svg)](https://github.com/Yuvrajpawar45/RAG-Document-Intelligence/actions/workflows/tests.yml)
 [![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://streamlit.io)
@@ -10,7 +13,7 @@
 
 Ask questions about PDFs or pasted text and get cited answers using FastAPI, Streamlit, FAISS, sentence-transformers, and Groq.
 
-[Quick Start](#quick-start) | [Architecture](#architecture) | [API Reference](#api-reference) | [Testing](#testing) | [Interview Notes](#interview-notes)
+[Quick Start](#quick-start) | [Architecture](#architecture) | [Why These Choices?](#why-these-choices) | [API Reference](#api-reference) | [Testing](#testing) | [Interview Talking Points](#interview-talking-points)
 
 </div>
 
@@ -93,6 +96,18 @@ Sources:
 | LLM provider | Groq |
 | Testing | pytest |
 | Configuration | python-dotenv |
+
+## Why These Choices?
+
+| Choice | Why it fits this project | Tradeoff |
+| --- | --- | --- |
+| FastAPI backend | Clean API boundary for ingestion, retrieval, stats, and querying. | Adds a second process beside Streamlit. |
+| Streamlit frontend | Fast to demo, easy file upload flow, and enough UI for a portfolio project. | Less control than a custom React frontend. |
+| FAISS `IndexFlatIP` | Simple local vector search with cosine similarity via normalized embeddings. | Exact search is not ideal for very large corpora. |
+| `all-MiniLM-L6-v2` embeddings | CPU-friendly, quick to run locally, and good enough for semantic document retrieval. | Larger embedding models can improve nuanced retrieval. |
+| Character chunking | Dependency-light and transparent for interview discussion. | Token-aware chunking would manage LLM context more precisely. |
+| Groq Llama 3.3 70B | Low-latency hosted generation for strong demo responsiveness. | Requires a Groq API key and network access. |
+| Local persistence in `data/` | Keeps the project simple to run without external databases. | Multi-user isolation and cloud deployment need additional storage design. |
 
 ## Architecture
 
@@ -365,6 +380,31 @@ The test suite covers:
 - Index clearing
 - Stats generation
 - Answer response shape
+
+## Interview Talking Points
+
+- Built a complete RAG loop: ingestion, chunking, embedding, vector search, answer generation, and citations.
+- Kept retrieval local with FAISS so the project is easy to clone, run, and explain without a hosted vector database.
+- Used normalized embeddings with `IndexFlatIP`, making similarity scores interpretable as cosine similarity.
+- Separated Streamlit and FastAPI to show a realistic frontend/backend boundary instead of a single notebook-style demo.
+- Added unit tests around the core RAG behavior so the project can show a passing CI signal on GitHub.
+- Clear next steps: token-aware chunking, hybrid search, reranking, evaluation datasets, Docker, and multi-user session isolation.
+
+**Q: What problem does this project solve?**
+
+It solves document question answering by combining retrieval with generation. Instead of asking an LLM to answer from memory, the system retrieves relevant document chunks first and then asks the LLM to answer using that context.
+
+**Q: How would you improve retrieval quality?**
+
+I would add token-aware chunking, hybrid search with BM25 plus dense retrieval, metadata filtering, and a cross-encoder reranker before sending context to the LLM.
+
+**Q: How would you scale it?**
+
+For larger collections, I would move from `IndexFlatIP` to an approximate nearest-neighbor index such as IVF or HNSW, add a metadata database, run ingestion asynchronously, and shard the vector index if needed.
+
+**Q: How would you evaluate it?**
+
+I would measure retrieval precision and recall on a small labeled evaluation set, then use RAG evaluation metrics such as faithfulness, answer relevancy, and context precision.
 
 ## Troubleshooting
 
