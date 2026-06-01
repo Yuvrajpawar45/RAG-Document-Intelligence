@@ -7,11 +7,11 @@ Run: streamlit run app.py
 import os
 import streamlit as st
 import requests
-import json
 from dotenv import load_dotenv
 
 load_dotenv()
-API = os.getenv("DOCMIND_API_URL", "http://localhost:8001").rstrip("/")
+# Default to port 8000 — must match: uvicorn backend.api:app --port 8000
+API = os.getenv("DOCMIND_API_URL", "http://localhost:8000").rstrip("/")
 
 # ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -290,7 +290,7 @@ def get_stats():
     try:
         r = requests.get(f"{API}/stats", timeout=3)
         return r.json() if r.ok else None
-    except:
+    except Exception:
         return None
 
 def ingest_pdf_file(file_bytes, filename):

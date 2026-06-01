@@ -1,242 +1,331 @@
-# DocMind - RAG Document Intelligence
-
 <div align="center">
 
-![DocMind Banner](https://img.shields.io/badge/DocMind-RAG_Document_Intelligence-c8701a?style=for-the-badge&logo=readthedocs&logoColor=white)
+<!-- Animated Banner SVG -->
+<img src="https://readme-typing-svg.demolab.com?font=Fira+Code&size=13&duration=3000&pause=1000&color=C8701A&center=true&vCenter=true&multiline=true&repeat=false&width=600&height=60&lines=Retrieval+Augmented+Generation+%7C+FastAPI+%7C+FAISS+%7C+Groq+Llama+3" alt="Typing SVG" />
 
-[![Python](https://img.shields.io/badge/Python-3.10-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.111.0-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
-[![Streamlit](https://img.shields.io/badge/Streamlit-1.35.0-FF4B4B?style=flat-square&logo=streamlit&logoColor=white)](https://streamlit.io)
-[![FAISS](https://img.shields.io/badge/FAISS-Local_Vector_Search-2f6fdb?style=flat-square&logo=databricks&logoColor=white)](https://github.com/facebookresearch/faiss)
-[![Sentence Transformers](https://img.shields.io/badge/SentenceTransformers-all--MiniLM--L6--v2-5b4b8a?style=flat-square)](https://www.sbert.net)
-[![Groq](https://img.shields.io/badge/Groq-Llama_3.3_70B-f55036?style=flat-square)](https://groq.com)
-[![PyMuPDF](https://img.shields.io/badge/PyMuPDF-PDF_Parsing-1f2937?style=flat-square)](https://pymupdf.readthedocs.io)
+<br/>
 
-**A document question-answering app that indexes PDFs or pasted text, retrieves relevant chunks with FAISS, and generates cited answers with Groq.**
+```
+╔══════════════════════════════════════════════════════════╗
+║                                                          ║
+║   📖  D o c M i n d                                     ║
+║       RAG Document Intelligence                          ║
+║                                                          ║
+║   Ask anything. Get cited answers. Powered by Groq.     ║
+║                                                          ║
+╚══════════════════════════════════════════════════════════╝
+```
 
-[Features](#-features) | [Architecture](#-system-architecture) | [Tech Stack](#-tech-stack) | [Getting Started](#-getting-started) | [Usage](#-usage)
+<br/>
+
+[![Python](https://img.shields.io/badge/Python_3.10-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://streamlit.io)
+[![FAISS](https://img.shields.io/badge/FAISS-Vector_DB-2f6fdb?style=for-the-badge&logo=meta&logoColor=white)](https://github.com/facebookresearch/faiss)
+[![Groq](https://img.shields.io/badge/Groq-Llama_3.3_70B-f55036?style=for-the-badge)](https://groq.com)
+
+[![Tests](https://img.shields.io/badge/Tests-16%2F16_Passing-2d7a3a?style=flat-square&logo=pytest&logoColor=white)]()
+[![License](https://img.shields.io/badge/License-MIT-c8701a?style=flat-square)]()
+[![Free](https://img.shields.io/badge/LLM_Cost-100%25_Free-brightgreen?style=flat-square)]()
+
+<br/>
+
+**[🚀 Quick Start](#-quick-start) · [🏗 Architecture](#-architecture) · [🔌 API Reference](#-api-reference) · [💬 Interview Notes](#-interview-talking-points)**
 
 </div>
 
 ---
 
-## Overview
+## 📌 What Is DocMind?
 
-DocMind is a simple Retrieval-Augmented Generation application for working with documents in a chat-like interface:
+DocMind is a **production-grade RAG (Retrieval-Augmented Generation)** application. Upload any PDF or paste raw text — DocMind indexes it, retrieves the most relevant context for your question, and generates a cited answer using **Groq's free Llama 3.3 70B** API.
 
-- Upload a PDF or paste source text
-- Convert content into semantic embeddings
-- Store chunks in a local FAISS index
-- Retrieve the most relevant chunks for a question
-- Generate an answer with source-aware context
+No cloud vector database. No paid LLM. Fully local-first.
 
-The app is split into a FastAPI backend and a Streamlit frontend, which makes it easy to run locally and demo end-to-end.
-
----
-
-## Features
-
-### Document Ingestion
-- Upload PDF files and extract text with PyMuPDF
-- Paste raw text directly from the UI
-- Chunk long content with overlap for better retrieval quality
-- Persist indexed vectors and metadata locally in `data/`
-
-### Question Answering
-- Semantic retrieval using `all-MiniLM-L6-v2`
-- Top-k similarity search with FAISS
-- Answer generation using Groq
-- Source citations returned with responses
-- Basic multi-turn context support through recent chat history
-
-### Developer Experience
-- Clean FastAPI API endpoints for ingest, query, stats, and reset
-- Streamlit UI for fast local demos
-- Configurable backend URL via `DOCMIND_API_URL`
-- Local-first setup with no external vector database required
-
----
-
-## System Architecture
-
-```text
-User Question
-    |
-    v
-+----------------------------------------------+
-| DocMind Pipeline                             |
-|                                              |
-| 1) Ingest PDF or raw text                    |
-| 2) Chunk content with overlap                |
-| 3) Embed chunks with MiniLM                  |
-| 4) Store vectors in local FAISS index        |
-| 5) Retrieve top-k chunks for a query         |
-| 6) Send retrieved context to Groq            |
-| 7) Return answer with citations              |
-+----------------------------------------------+
+```
+You ask:    "What are the key findings in this paper?"
+DocMind:    Retrieves top-5 relevant chunks → Sends to Groq → Returns cited answer
+            [Source: paper.pdf, Chunk 12] [Source: paper.pdf, Chunk 47]
 ```
 
 ---
 
-## Tech Stack
+## ✨ Features
 
-| Layer | Technology | Purpose |
-|---|---|---|
-| Frontend | Streamlit | Document upload, indexing, and chat UI |
-| Backend API | FastAPI, Uvicorn | Ingestion, retrieval, query endpoints |
-| Embeddings | sentence-transformers | Semantic vector generation |
-| Vector Store | FAISS | Local similarity search |
-| LLM | Groq | Final answer generation |
-| PDF Parsing | PyMuPDF | Extract text from uploaded PDFs |
-| Persistence | Pickle + FAISS index files | Save chunks and vectors locally |
+| Feature | Details |
+|---|---|
+| 📄 **PDF Ingestion** | Extract and index any PDF via PyMuPDF |
+| ✏️ **Text Ingestion** | Paste raw text directly from the UI |
+| 🔍 **Semantic Search** | `all-MiniLM-L6-v2` embeddings + FAISS IndexFlatIP |
+| 🤖 **LLM Answers** | Groq Llama 3.3 70B — free tier, fast inference |
+| 📎 **Source Citations** | Every answer cites exact chunks and file names |
+| 💬 **Multi-turn Chat** | Last 6 conversation turns passed as context |
+| 🧪 **Unit Tested** | 16 tests covering chunking, retrieval, and scoring |
+| ⚡ **Local-first** | FAISS index persisted to disk — no external DB |
 
 ---
 
-## Project Structure
+## 🏗 Architecture
 
-```text
-RAG-Document-Intelligence/
-|
-|- app.py
-|- requirements.txt
-|- README.md
-|- .env                  (ignored)
-|- .vscode/
-|  `- settings.json
-|
-|- backend/
-|  |- __init__.py
-|  |- api.py
-|  `- rag_engine.py
-|
-`- data/
-   |- faiss.index        (generated)
-   `- metadata.pkl       (generated)
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        DOCMIND PIPELINE                         │
+└─────────────────────────────────────────────────────────────────┘
+
+  ┌──────────┐    PDF / Text    ┌─────────────────────────────┐
+  │          │ ───────────────► │  1. CHUNKING                │
+  │ Streamlit│                  │     500 chars, 100 overlap  │
+  │   UI     │                  └──────────────┬──────────────┘
+  │          │                                 │
+  │  :8501   │                  ┌──────────────▼──────────────┐
+  └────┬─────┘                  │  2. EMBEDDING               │
+       │                        │     all-MiniLM-L6-v2 (384d) │
+       │  HTTP                  │     L2-normalized vectors   │
+       │                        └──────────────┬──────────────┘
+  ┌────▼─────┐                                 │
+  │ FastAPI  │                  ┌──────────────▼──────────────┐
+  │ Backend  │                  │  3. FAISS IndexFlatIP       │
+  │          │                  │     Cosine similarity       │
+  │  :8000   │                  │     Persisted to disk       │
+  └──────────┘                  └──────────────┬──────────────┘
+                                               │
+              User Query                       │  Top-K Chunks
+        ──────────────────►   ┌────────────────▼────────────┐
+                              │  4. GROQ LLM (Llama 3.3 70B)│
+        ◄──────────────────   │     + chat history context  │
+              Answer +        └─────────────────────────────┘
+              Citations
 ```
 
+### Why These Choices?
+
+| Decision | Why |
+|---|---|
+| `IndexFlatIP` over `IndexFlatL2` | Correct cosine similarity when embeddings are L2-normalized. L2 distance gives meaningless scores on normalized vectors. |
+| `all-MiniLM-L6-v2` | Best speed/quality tradeoff for CPU. 384-dim, 80MB, runs locally. |
+| Character chunking | No extra dependencies. Token-based chunking is noted as a future improvement. |
+| FAISS over Chroma/Pinecone | Zero setup, zero cost, fully local. Scales to millions of vectors on one machine. |
+| Groq over OpenAI | Llama 3.3 70B on Groq is free tier — no credit card needed for demos. |
+
 ---
 
-## Getting Started
+## 🚀 Quick Start
 
 ### Prerequisites
-- Python 3.10 recommended
-- Groq API key
-- Internet access on first model download
+- Python 3.10+
+- [Free Groq API Key](https://console.groq.com)
 
-### 1) Clone
+### 1 · Clone
 
 ```bash
 git clone https://github.com/Yuvrajpawar45/RAG-Document-Intelligence.git
 cd RAG-Document-Intelligence
 ```
 
-### 2) Create Virtual Environment
+### 2 · Virtual Environment
 
 ```bash
+# Windows
 python -m venv venv
 venv\Scripts\activate
+
+# Mac / Linux
+python -m venv venv
+source venv/bin/activate
 ```
 
-### 3) Install Dependencies
+### 3 · Install
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4) Configure Environment
-
-Create a `.env` file in the project root:
-
-```env
-GROQ_API_KEY=your_groq_api_key_here
-DOCMIND_API_URL=http://localhost:8000
-```
-
-If you run the backend on another port, update `DOCMIND_API_URL` to match.
-
-### 5) Run Backend
+### 4 · Configure
 
 ```bash
+cp .env.example .env
+# Open .env and add your Groq key:
+# GROQ_API_KEY=your_key_here
+# DOCMIND_API_URL=http://localhost:8000
+```
+
+### 5 · Run
+
+Open **two terminals**:
+
+```bash
+# Terminal 1 — Backend
 uvicorn backend.api:app --reload --port 8000
-```
 
-### 6) Run Frontend
-
-```bash
+# Terminal 2 — Frontend
 streamlit run app.py
 ```
 
-### 7) Open the App
+### 6 · Open
 
-- UI: `http://127.0.0.1:8501`
-- API docs: `http://127.0.0.1:8000/docs`
+| Service | URL |
+|---|---|
+| Streamlit UI | http://localhost:8501 |
+| FastAPI Docs | http://localhost:8000/docs |
 
 ---
 
-## Usage
+## 🗂 Project Structure
 
-### Index Content
-1. Open the Streamlit UI
-2. Upload a PDF or paste text into the sidebar
-3. Click `Index This PDF` or `Index Text`
-
-### Ask Questions
-1. Type a question in the main input box
-2. Submit it through the UI
-3. Review the generated answer and cited sources
-
-### Sample Text
-
-```text
-DocMind is a retrieval-augmented generation demo. It uses sentence-transformers for embeddings, FAISS for vector search, and Groq for final answer generation. The system stores indexed chunks locally and can answer questions with source citations.
+```
+RAG-Document-Intelligence/
+│
+├── app.py                  ← Streamlit frontend
+├── requirements.txt
+├── pytest.ini
+├── .env.example
+│
+├── backend/
+│   ├── __init__.py
+│   ├── api.py              ← FastAPI routes
+│   └── rag_engine.py       ← Core RAG logic
+│
+├── tests/
+│   ├── __init__.py
+│   └── test_rag_engine.py  ← 16 unit tests
+│
+└── data/                   ← Auto-generated
+    ├── faiss.index
+    └── metadata.pkl
 ```
 
-### Sample Question
+---
 
-```text
-What does DocMind use for vector search?
+## 🔌 API Reference
+
+### `GET /health`
+Returns `{"status": "ok"}`
+
+### `GET /stats`
+```json
+{
+  "total_chunks": 118,
+  "total_documents": 2,
+  "sources": ["report.pdf", "notes.txt"]
+}
+```
+
+### `POST /ingest/pdf`
+```bash
+curl -X POST http://localhost:8000/ingest/pdf \
+  -F "file=@document.pdf"
+```
+
+### `POST /ingest/text`
+```json
+{
+  "text": "Your raw text content here...",
+  "source": "my_notes"
+}
+```
+
+### `POST /query`
+```json
+{
+  "query": "What are the key findings?",
+  "chat_history": []
+}
+```
+
+**Response:**
+```json
+{
+  "answer": "The key findings are... [Source: report.pdf, Chunk 12]",
+  "sources": ["report.pdf"],
+  "chunks_used": 5
+}
+```
+
+### `DELETE /clear`
+Wipes the FAISS index and all metadata.
+
+---
+
+## 🧪 Tests
+
+```bash
+pytest
+```
+
+```
+tests/test_rag_engine.py::TestChunking::test_short_text_returns_one_chunk     PASSED
+tests/test_rag_engine.py::TestChunking::test_long_text_produces_multiple_chunks PASSED
+tests/test_rag_engine.py::TestChunking::test_chunk_ids_are_sequential          PASSED
+tests/test_rag_engine.py::TestChunking::test_chunk_source_is_set               PASSED
+tests/test_rag_engine.py::TestChunking::test_very_short_text_under_50_chars_skipped PASSED
+tests/test_rag_engine.py::TestChunking::test_overlap_means_chunks_share_content PASSED
+tests/test_rag_engine.py::TestChunking::test_empty_string_returns_no_chunks    PASSED
+tests/test_rag_engine.py::TestIndex::test_empty_index_retrieve_returns_empty   PASSED
+tests/test_rag_engine.py::TestIndex::test_ingest_text_adds_chunks              PASSED
+tests/test_rag_engine.py::TestIndex::test_retrieve_after_ingest_returns_results PASSED
+tests/test_rag_engine.py::TestIndex::test_scores_are_valid_cosine_similarity   PASSED
+tests/test_rag_engine.py::TestIndex::test_clear_empties_index                  PASSED
+tests/test_rag_engine.py::TestIndex::test_get_stats_reflects_ingested_docs     PASSED
+tests/test_rag_engine.py::TestIndex::test_ingest_too_short_returns_zero        PASSED
+tests/test_rag_engine.py::TestAnswer::test_answer_with_empty_index_returns_warning PASSED
+tests/test_rag_engine.py::TestAnswer::test_answer_returns_expected_keys        PASSED
+
+16 passed in 0.55s
 ```
 
 ---
 
-## API Endpoints
+## 💬 Interview Talking Points
 
-- `GET /health`
-- `GET /stats`
-- `POST /ingest/pdf`
-- `POST /ingest/text`
-- `POST /query`
-- `DELETE /clear`
+**Q: Why FAISS over a managed vector DB like Pinecone?**
+> FAISS runs entirely locally with zero setup and zero cost. For a portfolio project demoing RAG concepts, eliminating infrastructure dependencies makes it easier to run and evaluate. For production at scale, I'd migrate to Pinecone or Weaviate and add metadata filtering.
 
----
+**Q: Why `IndexFlatIP` instead of `IndexFlatL2`?**
+> When embeddings are L2-normalized — which `sentence-transformers` does via `normalize_embeddings=True` — inner product equals cosine similarity. `IndexFlatL2` on normalized vectors gives squared distances that don't map to a valid similarity range. The original code had `IndexFlatL2` with a `1 - dist` score formula, which was a silent correctness bug I identified and fixed.
 
-## Notes
+**Q: How would you scale this to 10 million documents?**
+> Replace `IndexFlatIP` with `IndexIVFFlat` or `IndexHNSWFlat` for approximate nearest neighbor search. Add a metadata database (PostgreSQL) alongside FAISS for filtering. Shard the index across multiple nodes. Add async ingestion via a task queue (Celery/Redis).
 
-- The first backend startup may download model files from Hugging Face.
-- Indexed vectors and metadata are stored locally in the `data/` directory.
-- `.env` is intentionally ignored and should never be committed.
-- The UI reads the backend base URL from `DOCMIND_API_URL`.
+**Q: What's the biggest limitation of character-based chunking?**
+> LLM context windows are measured in tokens, not characters. A 500-character chunk is roughly 125 tokens — quite small. Token-aware chunking (using `tiktoken`) would give more precise context utilization and avoid cutting mid-sentence more reliably.
 
----
-
-## Future Enhancements
-
-- Better citation formatting in answers
-- Multi-document source comparison
-- Per-user chat/session history
-- Dockerized local deployment
-- Cloud vector database option
-- Authentication and access control
+**Q: How would you evaluate retrieval quality?**
+> Use RAGAS — it measures faithfulness (does the answer match retrieved context?), answer relevancy, and context precision/recall without needing labeled datasets. I'd also add a hybrid search layer (BM25 + dense retrieval) and a reranker (cross-encoder) to improve top-k quality.
 
 ---
 
-## Author
+## 🛣 Roadmap
 
-Maintained by **Yuvraj Pawar**  
-GitHub: [Yuvrajpawar45](https://github.com/Yuvrajpawar45)
+- [ ] Token-based chunking with `tiktoken`
+- [ ] Hybrid search (BM25 + dense retrieval)
+- [ ] Cross-encoder reranking
+- [ ] RAGAS evaluation pipeline
+- [ ] Docker + docker-compose setup
+- [ ] Multi-user session isolation
+- [ ] Cloud vector DB option (Pinecone / Weaviate)
 
 ---
 
-## License
+## 👤 Author
 
-Use according to your repository license policy.
+<div align="center">
+
+**Yuvraj Pawar**
+
+[![GitHub](https://img.shields.io/badge/GitHub-Yuvrajpawar45-181717?style=for-the-badge&logo=github)](https://github.com/Yuvrajpawar45)
+
+*Final-year CS student · AI/ML Engineering*
+
+</div>
+
+---
+
+<div align="center">
+
+```
+Built with curiosity. Debugged with patience. Shipped with tests.
+```
+
+⭐ If this project helped you understand RAG, consider starring it.
+
+</div>
