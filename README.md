@@ -366,46 +366,6 @@ The test suite covers:
 - Stats generation
 - Answer response shape
 
-## Key Design Decisions
-
-### Why FAISS?
-
-FAISS keeps the project local-first and simple to run. It avoids cloud vector database setup while still demonstrating real vector search behavior.
-
-### Why `IndexFlatIP`?
-
-The embeddings are L2-normalized. With normalized vectors, inner product is equivalent to cosine similarity. That makes `IndexFlatIP` the correct FAISS index for this setup.
-
-### Why `all-MiniLM-L6-v2`?
-
-It is small, fast on CPU, and strong enough for a portfolio RAG system. Its 384-dimensional embeddings are efficient to store and search.
-
-### Why character-based chunking?
-
-Character chunking keeps the implementation lightweight and dependency-free. A token-aware chunker would be a good future improvement for more precise context control.
-
-### Why Groq?
-
-Groq provides fast hosted inference for open models and works well for demos where latency matters.
-
-## Interview Notes
-
-**Q: What problem does this project solve?**
-
-It solves document question answering by combining retrieval with generation. Instead of asking an LLM to answer from memory, the system retrieves relevant document chunks first and then asks the LLM to answer using that context.
-
-**Q: How would you improve retrieval quality?**
-
-I would add token-aware chunking, hybrid search with BM25 plus dense retrieval, metadata filtering, and a cross-encoder reranker before sending context to the LLM.
-
-**Q: How would you scale it?**
-
-For larger collections, I would move from `IndexFlatIP` to an approximate nearest-neighbor index such as IVF or HNSW, add a metadata database, run ingestion asynchronously, and shard the vector index if needed.
-
-**Q: How would you evaluate it?**
-
-I would measure retrieval precision and recall on a small labeled evaluation set, then use RAG evaluation metrics such as faithfulness, answer relevancy, and context precision.
-
 ## Troubleshooting
 
 ### `GROQ_API_KEY not found`
