@@ -45,7 +45,7 @@ sys.modules["fitz"] = fitz_mod
 os.environ["GROQ_API_KEY"] = "test_key_not_real"
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from backend.rag_engine import RAGEngine, CHUNK_SIZE, CHUNK_OVERLAP
+from backend.rag_engine import RAGEngine, CHUNK_SIZE, CHUNK_OVERLAP, chunk_text
 
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -98,6 +98,17 @@ class TestChunking:
         chunks = engine._chunk_text("", "test.pdf")
         assert chunks == []
 
+    def test_sentence_strategy_keeps_sentence_boundaries(self):
+        sentence = "Sentence-aware chunking keeps this complete sentence intact. "
+        chunks = chunk_text(sentence * 20, "sentence")
+        assert len(chunks) > 1
+        assert all(chunk.endswith(".") for chunk in chunks)
+        assert all(len(chunk) <= CHUNK_SIZE for chunk in chunks)
+
+    def test_unknown_strategy_is_rejected(self):
+        with pytest.raises(ValueError, match="Unknown chunking strategy"):
+            chunk_text("A sufficiently long sample sentence." * 3, "unknown")
+
 
 # ── Index / retrieval tests ───────────────────────────────────────────────────
 
@@ -110,6 +121,10 @@ class TestIndex:
         n = engine.ingest_text("E" * 300, "source_a")
         assert n > 0
         assert engine.index.ntotal == n
+
+    def test_ingest_text_records_sentence_strategy(self, engine):
+        engine.ingest_text("One sentence about AI. " * 30, "source_a", "sentence")
+        assert all(c["chunking_strategy"] == "sentence" for c in engine.chunks)
 
     def test_retrieve_after_ingest_returns_results(self, engine):
         engine.ingest_text("The sky is blue and the grass is green. " * 20, "nature.txt")

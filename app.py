@@ -5,6 +5,8 @@ Run: streamlit run app.py
 """
 
 import os
+from pathlib import Path
+
 import streamlit as st
 import requests
 from dotenv import load_dotenv
@@ -293,22 +295,23 @@ def get_stats():
     except Exception:
         return None
 
-def ingest_pdf_file(file_bytes, filename):
+def ingest_pdf_file(file_bytes, filename, strategy):
     try:
         r = requests.post(
             f"{API}/ingest/pdf",
             files={"file": (filename, file_bytes, "application/pdf")},
+            data={"strategy": strategy},
             timeout=60
         )
         return r.json()
     except Exception as e:
         return {"error": str(e)}
 
-def ingest_text_content(text, source):
+def ingest_text_content(text, source, strategy):
     try:
         r = requests.post(
             f"{API}/ingest/text",
-            json={"text": text, "source": source},
+            json={"text": text, "source": source, "strategy": strategy},
             timeout=30
         )
         return r.json()
@@ -378,6 +381,16 @@ sidebar, main_col = st.columns([1, 2.5])
 # ── SIDEBAR ───────────────────────────────────────────────────────────────────
 with sidebar:
 
+    st.markdown('<div class="section-label">Chunking Strategy</div>', unsafe_allow_html=True)
+    strategy_label = st.selectbox(
+        "Chunking Strategy",
+        ["Fixed", "Sentence-Aware"],
+        label_visibility="collapsed",
+        help="Fixed uses overlapping character windows. Sentence-Aware keeps complete sentences together.",
+    )
+    chunking_strategy = "fixed" if strategy_label == "Fixed" else "sentence"
+    st.markdown("<br>", unsafe_allow_html=True)
+
     # PDF Upload
     st.markdown('<div class="section-label">📄 Upload PDF</div>', unsafe_allow_html=True)
     uploaded_file = st.file_uploader(
@@ -392,7 +405,11 @@ with sidebar:
                 st.error("API is offline.")
             else:
                 with st.spinner(f"Indexing {uploaded_file.name}..."):
-                    result = ingest_pdf_file(uploaded_file.read(), uploaded_file.name)
+                    result = ingest_pdf_file(
+                        uploaded_file.read(),
+                        uploaded_file.name,
+                        chunking_strategy,
+                    )
                 if "error" in result:
                     st.error(f"Failed: {result['error']}")
                     st.session_state.indexed_files.append({"name": uploaded_file.name, "status": "error", "chunks": 0})
@@ -426,7 +443,7 @@ with sidebar:
             st.warning("Text too short (min 50 characters)")
         else:
             with st.spinner("Indexing..."):
-                result = ingest_text_content(text_input, source_name)
+                result = ingest_text_content(text_input, source_name, chunking_strategy)
             if "error" in result:
                 st.error(result["error"])
             else:
@@ -456,7 +473,7 @@ with sidebar:
 
 
 # ── MAIN CHAT ─────────────────────────────────────────────────────────────────
-with main_col:
+def render_conversation():
 
     st.markdown('<div class="section-label">💬 Conversation</div>', unsafe_allow_html=True)
 
@@ -547,3 +564,17 @@ with main_col:
                 if len(st.session_state.api_history) > 12:
                     st.session_state.api_history = st.session_state.api_history[-12:]
                 st.rerun()
+
+
+with main_col:
+    conversation_tab, benchmark_tab = st.tabs(["Conversation", "📊 Benchmark"])
+
+    with conversation_tab:
+        render_conversation()
+
+    with benchmark_tab:
+        results_path = Path("eval/eval_results.md")
+        if results_path.exists():
+            st.markdown(results_path.read_text(encoding="utf-8"))
+        else:
+            st.info("Run `python eval/run_eval.py` to generate benchmark results.")

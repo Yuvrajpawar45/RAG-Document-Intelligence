@@ -3,17 +3,17 @@ FastAPI Backend — RAG Q&A API
 Run: uvicorn backend.api:app --reload --port 8000
 """
 
-import shutil
 import tempfile
+from typing import Literal
 from pathlib import Path
 
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from backend.rag_engine import RAGEngine
+from backend.rag_engine import RAGEngine, chunk_stats
 
-app = FastAPI(title="RAG Q&A API", version="2.1.0")
+app = FastAPI(title="RAG Q&A API", version="2.2.0")
 
 # NOTE: allow_origins=["*"] is fine for local development.
 # For production, replace "*" with your actual frontend domain:
@@ -38,6 +38,11 @@ except EnvironmentError as e:
 class TextIngestRequest(BaseModel):
     text: str
     source: str = "manual_input"
+    strategy: Literal["fixed", "sentence"] = "fixed"
+
+
+class CompareChunkingRequest(BaseModel):
+    text: str
 
 
 class QueryRequest(BaseModel):
@@ -56,7 +61,10 @@ def stats():
 
 
 @app.post("/ingest/pdf")
-async def ingest_pdf(file: UploadFile = File(...)):
+async def ingest_pdf(
+    file: UploadFile = File(...),
+    strategy: Literal["fixed", "sentence"] = Form("fixed"),
+):
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(400, "Only PDF files are supported")
 
@@ -70,7 +78,7 @@ async def ingest_pdf(file: UploadFile = File(...)):
         tmp_path = tmp.name
 
     try:
-        chunks_added = rag.ingest_pdf(tmp_path)
+        chunks_added = rag.ingest_pdf(tmp_path, strategy)
     except Exception as e:
         raise HTTPException(500, f"Failed to process PDF: {str(e)}")
     finally:
@@ -88,13 +96,24 @@ def ingest_text(req: TextIngestRequest):
     if len(req.text.strip()) < 50:
         raise HTTPException(400, "Text too short (minimum 50 characters)")
     try:
-        chunks_added = rag.ingest_text(req.text, req.source)
+        chunks_added = rag.ingest_text(req.text, req.source, req.strategy)
     except Exception as e:
         raise HTTPException(500, f"Failed to ingest text: {str(e)}")
     return {
         "message": f"✅ Ingested '{req.source}' — {chunks_added} chunks",
         "chunks_added": chunks_added,
         "stats": rag.get_stats()
+    }
+
+
+@app.post("/compare-chunking")
+def compare_chunking(req: CompareChunkingRequest):
+    if len(req.text.strip()) < 50:
+        raise HTTPException(400, "Text too short (minimum 50 characters)")
+    return {
+        "text_chars": len(req.text.strip()),
+        "fixed": chunk_stats(req.text, "fixed"),
+        "sentence": chunk_stats(req.text, "sentence"),
     }
 
 

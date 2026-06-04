@@ -15,6 +15,7 @@ import faiss
 from sentence_transformers import SentenceTransformer
 from groq import Groq
 import fitz  # PyMuPDF
+from nltk.tokenize import PunktSentenceTokenizer
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -31,9 +32,84 @@ CHUNK_SIZE    = 500                         # characters per chunk
                                             # but character-based is dependency-free.
 CHUNK_OVERLAP = 100                         # overlap to avoid losing context at boundaries
 TOP_K         = 5                           # chunks retrieved per query
+CHUNK_STRATEGIES = ("fixed", "sentence")
 INDEX_PATH    = Path("data/faiss.index")
 META_PATH     = Path("data/metadata.pkl")
 # ─────────────────────────────────────────────────────────────────────────────
+
+
+def _fixed_chunks(text: str) -> list[str]:
+    chunks, start = [], 0
+    while start < len(text):
+        chunk = text[start:min(start + CHUNK_SIZE, len(text))].strip()
+        if len(chunk) > 50:
+            chunks.append(chunk)
+        start += CHUNK_SIZE - CHUNK_OVERLAP
+    return chunks
+
+
+def _sentence_chunks(text: str) -> list[str]:
+    sentences = PunktSentenceTokenizer().tokenize(text)
+    chunks: list[str] = []
+    current: list[str] = []
+
+    for sentence in sentences:
+        sentence = sentence.strip()
+        if not sentence:
+            continue
+
+        if len(sentence) > CHUNK_SIZE:
+            if current:
+                chunks.append(" ".join(current))
+                current = []
+            chunks.extend(_fixed_chunks(sentence))
+            continue
+
+        candidate = " ".join(current + [sentence])
+        if current and len(candidate) > CHUNK_SIZE:
+            chunks.append(" ".join(current))
+            overlap: list[str] = []
+            overlap_length = 0
+            for previous in reversed(current):
+                added_length = len(previous) + (1 if overlap else 0)
+                if overlap_length + added_length > CHUNK_OVERLAP:
+                    break
+                overlap.insert(0, previous)
+                overlap_length += added_length
+            while overlap and len(" ".join(overlap + [sentence])) > CHUNK_SIZE:
+                overlap.pop(0)
+            current = overlap
+
+        current.append(sentence)
+
+    if current:
+        chunks.append(" ".join(current))
+    return [chunk for chunk in chunks if len(chunk) > 50]
+
+
+def chunk_text(text: str, strategy: str = "fixed") -> list[str]:
+    """Split text using fixed character windows or sentence-aware windows."""
+    if strategy not in CHUNK_STRATEGIES:
+        raise ValueError(
+            f"Unknown chunking strategy '{strategy}'. Choose from: {', '.join(CHUNK_STRATEGIES)}"
+        )
+
+    text = text.strip()
+    if not text:
+        return []
+    return _fixed_chunks(text) if strategy == "fixed" else _sentence_chunks(text)
+
+
+def chunk_stats(text: str, strategy: str) -> dict:
+    chunks = chunk_text(text, strategy)
+    lengths = [len(chunk) for chunk in chunks]
+    return {
+        "strategy": strategy,
+        "chunk_count": len(chunks),
+        "average_chunk_chars": round(sum(lengths) / len(lengths), 1) if lengths else 0,
+        "min_chunk_chars": min(lengths, default=0),
+        "max_chunk_chars": max(lengths, default=0),
+    }
 
 
 class RAGEngine:
@@ -64,17 +140,17 @@ class RAGEngine:
 
     # ── Ingestion ─────────────────────────────────────────────────────────────
 
-    def ingest_pdf(self, pdf_path: str) -> int:
+    def ingest_pdf(self, pdf_path: str, strategy: str = "fixed") -> int:
         doc = fitz.open(pdf_path)
         full_text = "".join(page.get_text() for page in doc)
         doc.close()
-        return self._ingest_text(full_text, Path(pdf_path).name)
+        return self._ingest_text(full_text, Path(pdf_path).name, strategy)
 
-    def ingest_text(self, text: str, source: str = "manual_input") -> int:
-        return self._ingest_text(text, source)
+    def ingest_text(self, text: str, source: str = "manual_input", strategy: str = "fixed") -> int:
+        return self._ingest_text(text, source, strategy)
 
-    def _ingest_text(self, text: str, source: str) -> int:
-        chunks = self._chunk_text(text, source)
+    def _ingest_text(self, text: str, source: str, strategy: str) -> int:
+        chunks = self._chunk_text(text, source, strategy)
         if not chunks:
             return 0
         texts = [c["text"] for c in chunks]
@@ -88,17 +164,16 @@ class RAGEngine:
         self._save_index()
         return len(chunks)
 
-    def _chunk_text(self, text: str, source: str) -> list[dict]:
-        text = text.strip()
-        chunks, start, chunk_id = [], 0, 0
-        while start < len(text):
-            end = min(start + CHUNK_SIZE, len(text))
-            chunk_text = text[start:end].strip()
-            if len(chunk_text) > 50:
-                chunks.append({"text": chunk_text, "source": source, "chunk_id": chunk_id})
-                chunk_id += 1
-            start += CHUNK_SIZE - CHUNK_OVERLAP
-        return chunks
+    def _chunk_text(self, text: str, source: str, strategy: str = "fixed") -> list[dict]:
+        return [
+            {
+                "text": chunk,
+                "source": source,
+                "chunk_id": chunk_id,
+                "chunking_strategy": strategy,
+            }
+            for chunk_id, chunk in enumerate(chunk_text(text, strategy))
+        ]
 
     # ── Retrieval ─────────────────────────────────────────────────────────────
 

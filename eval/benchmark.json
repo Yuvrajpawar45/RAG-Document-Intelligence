@@ -1,0 +1,34 @@
+[
+  {
+    "question": "What is the difference between classification and regression?",
+    "ground_truth_keywords": ["discrete categories", "continuous values"]
+  },
+  {
+    "question": "What tasks are clustering and dimensionality reduction used for?",
+    "ground_truth_keywords": ["groups similar examples", "smaller representation"]
+  },
+  {
+    "question": "How does reinforcement learning balance learning and using known actions?",
+    "ground_truth_keywords": ["exploration", "exploitation", "cumulative reward"]
+  },
+  {
+    "question": "How are neural network weights updated during training?",
+    "ground_truth_keywords": ["backpropagation", "optimizer", "loss function"]
+  },
+  {
+    "question": "How does retrieval-augmented generation help language models?",
+    "ground_truth_keywords": ["hallucinate", "external passages", "context"]
+  },
+  {
+    "question": "What is the difference between image classification, object detection, and segmentation?",
+    "ground_truth_keywords": ["entire image", "multiple objects", "individual pixels"]
+  },
+  {
+    "question": "When are precision and recall more useful than accuracy?",
+    "ground_truth_keywords": ["rare events", "predicted positives", "actual positives"]
+  },
+  {
+    "question": "What practices help manage bias, privacy, and accountability in AI?",
+    "ground_truth_keywords": ["testing performance across groups", "limiting access", "governance"]
+  }
+]

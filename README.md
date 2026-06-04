@@ -29,7 +29,9 @@ The project is designed as a clear portfolio-ready RAG system:
 - FastAPI backend for ingestion, retrieval, querying, stats, and clearing the index.
 - FAISS local vector index, persisted to disk.
 - `all-MiniLM-L6-v2` embeddings from `sentence-transformers`.
+- Selectable fixed-window or NLTK sentence-aware chunking.
 - Groq Llama 3.3 70B for answer generation.
+- A self-contained retrieval benchmark with Recall@3 and Recall@5.
 - Unit tests for chunking, retrieval, scoring, stats, and answer behavior.
 
 ## Demo Flow
@@ -82,6 +84,8 @@ Sources:
 | Source citations | Returns cited chunks and source filenames. |
 | Chat history | Sends recent conversation context to the backend. |
 | Local persistence | Saves FAISS index and metadata under `data/`. |
+| Chunking comparison | Supports fixed character windows and NLTK sentence-aware chunks. |
+| Retrieval benchmark | Compares Recall@3 and Recall@5 on a bundled 8-question dataset. |
 | Tests | Includes focused unit tests for core RAG behavior. |
 
 ## Tech Stack
@@ -105,7 +109,7 @@ Sources:
 | Streamlit frontend | Fast to demo, easy file upload flow, and enough UI for a portfolio project. | Less control than a custom React frontend. |
 | FAISS `IndexFlatIP` | Simple local vector search with cosine similarity via normalized embeddings. | Exact search is not ideal for very large corpora. |
 | `all-MiniLM-L6-v2` embeddings | CPU-friendly, quick to run locally, and good enough for semantic document retrieval. | Larger embedding models can improve nuanced retrieval. |
-| Character chunking | Dependency-light and transparent for interview discussion. | Token-aware chunking would manage LLM context more precisely. |
+| Selectable chunking | Fixed windows preserve the original behavior; sentence-aware chunks avoid cutting normal sentences. | Sentence-aware chunks have more variable lengths. |
 | Groq Llama 3.3 70B | Low-latency hosted generation for strong demo responsiveness. | Requires a Groq API key and network access. |
 | Local persistence in `data/` | Keeps the project simple to run without external databases. | Multi-user isolation and cloud deployment need additional storage design. |
 
@@ -134,7 +138,7 @@ Sources:
               v                                  v
    +----------------------+           +----------------------+
    |       Chunking       |           |  Embed user query    |
-   |  500 chars, overlap  |           +----------+-----------+
+   | Fixed or sentence    |           +----------+-----------+
    +----------+-----------+                      |
               |                                  v
               v                       +----------------------+
@@ -164,6 +168,12 @@ RAG-Document-Intelligence/
 |   |-- __init__.py
 |   |-- api.py                # FastAPI routes
 |   |-- rag_engine.py         # Core RAG logic
+|
+|-- eval/
+|   |-- benchmark.json        # 8 labeled retrieval questions
+|   |-- sample_doc.txt        # Self-contained AI/ML overview
+|   |-- run_eval.py           # Fixed vs sentence-aware benchmark
+|   |-- eval_results.md       # Generated benchmark table
 |
 |-- tests/
 |   |-- __init__.py
@@ -303,7 +313,8 @@ Uploads and indexes a PDF file.
 
 ```bash
 curl -X POST http://localhost:8000/ingest/pdf \
-  -F "file=@document.pdf"
+  -F "file=@document.pdf" \
+  -F "strategy=sentence"
 ```
 
 Example response:
@@ -327,7 +338,20 @@ Indexes raw text.
 ```json
 {
   "text": "Your raw text content here...",
-  "source": "my_notes"
+  "source": "my_notes",
+  "strategy": "sentence"
+}
+```
+
+The `strategy` field accepts `fixed` or `sentence` and defaults to `fixed`.
+
+### `POST /compare-chunking`
+
+Returns fixed and sentence-aware chunk counts and character-length stats without changing the index.
+
+```json
+{
+  "text": "A sufficiently long text sample to compare..."
 }
 ```
 
@@ -372,6 +396,7 @@ pytest
 The test suite covers:
 
 - Text chunking
+- Fixed and sentence-aware strategy behavior
 - Chunk overlap
 - Empty and short input handling
 - Text ingestion
@@ -381,6 +406,27 @@ The test suite covers:
 - Stats generation
 - Answer response shape
 
+## Chunking Comparison
+
+`fixed` preserves the original 500-character windows with 100-character overlap. It is predictable and simple, but it can split a sentence in the middle.
+
+`sentence` uses NLTK's Punkt sentence tokenizer, packs complete sentences into chunks up to 500 characters, and carries complete prior sentences as overlap when they fit. Sentences longer than the target size fall back to fixed windows.
+
+Run the bundled retrieval benchmark:
+
+```bash
+python eval/run_eval.py
+```
+
+The script evaluates both strategies against `eval/sample_doc.txt`, prints a table, and saves `eval/eval_results.md`.
+
+| Strategy | Chunks | Recall@3 | Recall@5 |
+| --- | ---: | ---: | ---: |
+| Fixed | 12 | 1.000 | 1.000 |
+| Sentence | 12 | 1.000 | 1.000 |
+
+On this compact overview document, sentence-aware chunking preserves complete sentences without reducing keyword retrieval recall. The benchmark is intentionally small and reproducible, so larger domain-specific datasets may produce different results.
+
 ## Interview Talking Points
 
 - Built a complete RAG loop: ingestion, chunking, embedding, vector search, answer generation, and citations.
@@ -388,7 +434,7 @@ The test suite covers:
 - Used normalized embeddings with `IndexFlatIP`, making similarity scores interpretable as cosine similarity.
 - Separated Streamlit and FastAPI to show a realistic frontend/backend boundary instead of a single notebook-style demo.
 - Added unit tests around the core RAG behavior so the project can show a passing CI signal on GitHub.
-- Clear next steps: token-aware chunking, hybrid search, reranking, evaluation datasets, Docker, and multi-user session isolation.
+- Clear next steps: token-aware chunking, hybrid search, reranking, larger evaluation datasets, Docker, and multi-user session isolation.
 
 **Q: What problem does this project solve?**
 
@@ -452,7 +498,7 @@ curl -X DELETE http://localhost:8000/clear
 - Token-aware chunking
 - Hybrid BM25 plus dense retrieval
 - Cross-encoder reranking
-- RAG evaluation pipeline
+- Larger domain-specific evaluation datasets
 - Docker and docker-compose setup
 - Multi-user session isolation
 - Optional cloud vector database support
