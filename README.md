@@ -34,6 +34,54 @@ The project is designed as a clear portfolio-ready RAG system:
 - A self-contained retrieval benchmark with Recall@3 and Recall@5.
 - Unit tests for chunking, retrieval, scoring, stats, and answer behavior.
 
+## Changes Implemented
+
+The project originally used only fixed-size character chunking. I extended it with a complete chunking comparison and evaluation workflow while keeping the existing RAG architecture and default behavior unchanged.
+
+### 1. Configurable Chunking Strategies
+
+- Added a reusable `chunk_text(text, strategy)` function in `backend/rag_engine.py`.
+- Preserved the original `fixed` strategy with 500-character chunks and 100-character overlap.
+- Added a new NLTK-powered `sentence` strategy that keeps complete sentences together whenever possible.
+- Added a safe fallback to fixed chunking for individual sentences longer than the chunk-size limit.
+- Stored the selected chunking strategy in each chunk's metadata.
+
+### 2. API Support and Chunk Comparison
+
+- Added a `strategy` parameter to both PDF and text ingestion endpoints.
+- Kept `fixed` as the default strategy so existing API clients continue to work.
+- Added `POST /compare-chunking`, which compares both strategies on a supplied text sample without modifying the FAISS index.
+- The comparison endpoint returns side-by-side chunk counts and minimum, maximum, and average chunk lengths.
+
+### 3. Self-Contained Retrieval Benchmark
+
+- Added a 635-word AI and machine learning overview in `eval/sample_doc.txt`.
+- Added eight labeled questions with ground-truth keywords in `eval/benchmark.json`.
+- Added `eval/run_eval.py` to evaluate both strategies using the same embedding model and FAISS retrieval process.
+- The evaluation computes Recall@3 and Recall@5, prints a results table, and saves it to `eval/eval_results.md`.
+
+Measured benchmark results:
+
+| Strategy | Chunks | Recall@3 | Recall@5 |
+| --- | ---: | ---: | ---: |
+| Fixed | 12 | 1.000 | 1.000 |
+| Sentence-Aware | 12 | 1.000 | 1.000 |
+
+On the bundled benchmark, sentence-aware chunking preserved complete sentences without reducing retrieval recall.
+
+### 4. Streamlit UI Improvements
+
+- Added a **Chunking Strategy** selector with Fixed and Sentence-Aware options.
+- Connected the selected strategy to both PDF and pasted-text ingestion.
+- Added a **Benchmark** tab that displays the generated evaluation results directly inside the application.
+
+### 5. Testing, Dependencies, and Repository Safety
+
+- Added tests for sentence-boundary preservation, chunk-size limits, invalid strategies, and strategy metadata.
+- Expanded the test suite to 19 passing tests.
+- Added and pinned `nltk==3.9.1`.
+- Updated `.gitignore` to exclude runtime log files while continuing to protect `.env`, local indexes, and the virtual environment.
+
 ## Demo Flow
 
 ```text
