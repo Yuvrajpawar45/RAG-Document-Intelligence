@@ -1,34 +1,66 @@
-[
-  {
-    "question": "What is the difference between classification and regression?",
-    "ground_truth_keywords": ["discrete categories", "continuous values"]
-  },
-  {
-    "question": "What tasks are clustering and dimensionality reduction used for?",
-    "ground_truth_keywords": ["groups similar examples", "smaller representation"]
-  },
-  {
-    "question": "How does reinforcement learning balance learning and using known actions?",
-    "ground_truth_keywords": ["exploration", "exploitation", "cumulative reward"]
-  },
-  {
-    "question": "How are neural network weights updated during training?",
-    "ground_truth_keywords": ["backpropagation", "optimizer", "loss function"]
-  },
-  {
-    "question": "How does retrieval-augmented generation help language models?",
-    "ground_truth_keywords": ["hallucinate", "external passages", "context"]
-  },
-  {
-    "question": "What is the difference between image classification, object detection, and segmentation?",
-    "ground_truth_keywords": ["entire image", "multiple objects", "individual pixels"]
-  },
-  {
-    "question": "When are precision and recall more useful than accuracy?",
-    "ground_truth_keywords": ["rare events", "predicted positives", "actual positives"]
-  },
-  {
-    "question": "What practices help manage bias, privacy, and accountability in AI?",
-    "ground_truth_keywords": ["testing performance across groups", "limiting access", "governance"]
-  }
-]
+{
+  "corpus": "Retrieval-Augmented Generation (RAG) is a technique that combines a retrieval system with a large language model to produce accurate, grounded answers. Instead of relying solely on the model's parametric memory, RAG fetches relevant passages from an external knowledge base at query time and injects them into the prompt as context. This approach was introduced by Lewis et al. in 2020 and has since become one of the most widely adopted architectures for knowledge-intensive NLP tasks.\n\nThe retrieval component typically uses a dense vector index. Documents are split into chunks, each chunk is encoded into a dense vector using an embedding model such as all-MiniLM-L6-v2 or text-embedding-3-small, and the vectors are stored in a vector database such as FAISS, Pinecone, or Weaviate. At query time, the user question is embedded with the same model, and the top-k most similar chunks are retrieved using approximate nearest-neighbour search.\n\nChunking strategy is a critical but often overlooked factor in RAG quality. Fixed-size chunking splits text every N characters regardless of sentence boundaries, which can truncate sentences and degrade embedding quality. Sentence-aware chunking groups complete sentences into chunks, preserving semantic coherence. Studies comparing the two strategies consistently show that sentence-aware chunking achieves higher recall at k=3 and k=5 because the retrieved passages contain complete, coherent thoughts rather than fragments.\n\nEmbedding quality directly affects retrieval recall. The all-MiniLM-L6-v2 model produces 384-dimensional vectors and runs entirely on CPU, making it suitable for local and free-tier deployments. Larger models such as text-embedding-3-large produce higher-quality embeddings but require API calls and incur cost. For most portfolio and prototype RAG systems, MiniLM provides a good quality-speed trade-off.\n\nFAISS (Facebook AI Similarity Search) is a library for efficient dense vector search. IndexFlatIP performs exact inner-product search, which is equivalent to cosine similarity when vectors are L2-normalised. For large corpora, IndexIVFFlat or HNSW indexes offer faster approximate search at the cost of a small recall drop. DocMind uses IndexFlatIP with normalised embeddings to compute exact cosine similarity.\n\nRecall at k (Recall@k) is the primary retrieval evaluation metric. It measures the fraction of questions for which the ground-truth passage appears in the top-k retrieved chunks. Recall@3 is a common benchmark because it reflects the typical context window budget passed to the LLM. A Recall@3 of 0.80 means 8 out of 10 questions had their answer in the top-3 retrieved passages.\n\nThe generation component receives the retrieved context and the user question and produces a grounded answer. Groq's Llama 3.3 70B model provides fast inference with strong instruction-following. Setting temperature to 0.1 reduces hallucination by making the model more deterministic. Requiring the model to cite passage numbers (e.g., [1], [2]) forces it to ground its answer in the retrieved context rather than its parametric memory.\n\nDeployment on Streamlit Community Cloud allows a RAG application to be shared publicly via a URL with no infrastructure cost. The main constraint is that Streamlit Cloud's file system is ephemeral, meaning a persisted FAISS index written to disk will be wiped on restart. The solution is to use an in-memory index stored in st.session_state, or to set the PERSIST_INDEX environment variable to false so the engine keeps the index in memory only for the duration of the session.\n\nEvaluating a RAG pipeline end-to-end requires both retrieval metrics and generation metrics. Retrieval metrics include Recall@k and Mean Reciprocal Rank (MRR). Generation metrics include faithfulness (does the answer contradict the context?), answer relevance (does the answer address the question?), and context precision (are the retrieved chunks actually used?). The RAGAS framework automates these metrics but requires an OpenAI-compatible LLM for scoring. A simpler alternative is a manual benchmark: prepare a set of questions with known ground-truth answers, run the pipeline, and compute Recall@k manually.",
+
+  "questions": [
+    {
+      "id": 1,
+      "question": "What is Retrieval-Augmented Generation?",
+      "ground_truth_keywords": ["retrieval system", "large language model", "external knowledge base", "grounded answers"],
+      "relevant_passage_hint": "RAG is a technique that combines a retrieval system with a large language model"
+    },
+    {
+      "id": 2,
+      "question": "Who introduced RAG and when?",
+      "ground_truth_keywords": ["Lewis", "2020"],
+      "relevant_passage_hint": "introduced by Lewis et al. in 2020"
+    },
+    {
+      "id": 3,
+      "question": "What embedding model does DocMind use and what are its dimensions?",
+      "ground_truth_keywords": ["all-MiniLM-L6-v2", "384"],
+      "relevant_passage_hint": "all-MiniLM-L6-v2 model produces 384-dimensional vectors"
+    },
+    {
+      "id": 4,
+      "question": "Why is sentence-aware chunking better than fixed-size chunking?",
+      "ground_truth_keywords": ["complete sentences", "semantic coherence", "fragments", "recall"],
+      "relevant_passage_hint": "sentence-aware chunking groups complete sentences into chunks preserving semantic coherence"
+    },
+    {
+      "id": 5,
+      "question": "What is Recall@k and why does DocMind use Recall@3?",
+      "ground_truth_keywords": ["fraction", "ground-truth", "top-k", "context window"],
+      "relevant_passage_hint": "Recall@3 is a common benchmark because it reflects the typical context window budget"
+    },
+    {
+      "id": 6,
+      "question": "What FAISS index type does DocMind use and why?",
+      "ground_truth_keywords": ["IndexFlatIP", "cosine similarity", "normalised", "exact"],
+      "relevant_passage_hint": "IndexFlatIP with normalised embeddings to compute exact cosine similarity"
+    },
+    {
+      "id": 7,
+      "question": "How does DocMind prevent hallucination in generated answers?",
+      "ground_truth_keywords": ["temperature", "0.1", "cite", "grounded"],
+      "relevant_passage_hint": "Setting temperature to 0.1 reduces hallucination"
+    },
+    {
+      "id": 8,
+      "question": "What is the constraint when deploying on Streamlit Community Cloud?",
+      "ground_truth_keywords": ["ephemeral", "FAISS index", "session_state", "PERSIST_INDEX"],
+      "relevant_passage_hint": "Streamlit Cloud's file system is ephemeral"
+    },
+    {
+      "id": 9,
+      "question": "What does RAGAS measure and what is its limitation?",
+      "ground_truth_keywords": ["faithfulness", "answer relevance", "context precision", "OpenAI"],
+      "relevant_passage_hint": "RAGAS framework automates these metrics but requires an OpenAI-compatible LLM"
+    },
+    {
+      "id": 10,
+      "question": "What vector databases can be used with RAG systems?",
+      "ground_truth_keywords": ["FAISS", "Pinecone", "Weaviate"],
+      "relevant_passage_hint": "FAISS, Pinecone, or Weaviate"
+    }
+  ]
+}

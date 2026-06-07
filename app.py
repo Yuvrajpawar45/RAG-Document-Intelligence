@@ -1,580 +1,473 @@
 """
-DocMind - RAG Document Intelligence
-Streamlit Frontend - Professional Warm UI
-Run: streamlit run app.py
+DocMind — Streamlit Frontend
+Works in two modes:
+  - Local (default)   : talks to FastAPI backend at DOCMIND_API_URL
+  - Standalone Cloud  : set DOCMIND_STANDALONE=true — RAG runs in-process
 """
 
 import os
+import sys
 from pathlib import Path
 
 import streamlit as st
-import requests
-from dotenv import load_dotenv
 
-load_dotenv()
-# Default to port 8000 — must match: uvicorn backend.api:app --port 8000
-API = os.getenv("DOCMIND_API_URL", "http://localhost:8000").rstrip("/")
+STANDALONE = os.getenv("DOCMIND_STANDALONE", "false").lower() == "true"
+API_URL    = os.getenv("DOCMIND_API_URL", "http://localhost:8000").rstrip("/")
 
-# ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="DocMind - RAG Document Intelligence",
-    page_icon="📖",
+    page_title="DocMind",
+    page_icon="🧠",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
 )
 
-# ── Custom CSS ────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Instrument+Sans:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
 
-/* Global */
-html, body, [class*="css"] {
-    font-family: 'Instrument Sans', sans-serif;
+html, body,
+[data-testid="stApp"],
+[data-testid="stAppViewContainer"],
+[data-testid="stMain"],
+.main, .block-container, [class*="css"] {
+    background-color: #F0F4FF !important;
+    color: #0F172A !important;
+    font-family: 'Inter', sans-serif !important;
 }
-
-.stApp {
-    background-color: #faf7f2;
-}
-
-/* Hide Streamlit default elements */
-#MainMenu, footer, header { visibility: hidden; }
-.block-container { padding-top: 1.5rem; padding-bottom: 1rem; }
-
-/* ── Top header bar ── */
-.docmind-header {
-    background: #ffffff;
-    border: 1px solid #ede5d8;
-    border-radius: 12px;
-    padding: 1rem 1.5rem;
-    margin-bottom: 1.25rem;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    box-shadow: 0 1px 4px rgba(28,22,18,0.07);
-}
-.docmind-logo {
-    font-family: 'Fraunces', serif;
-    font-size: 1.4rem;
-    font-weight: 600;
-    color: #1c1612;
-    letter-spacing: -0.02em;
-}
-.docmind-logo span { color: #c8701a; }
-.docmind-tagline { font-size: 0.78rem; color: #9c8878; margin-top: 0.1rem; }
-
-/* ── Stat badges ── */
-.stat-row { display: flex; gap: 0.6rem; flex-wrap: wrap; }
-.stat-badge {
-    background: #f5e6d0;
-    border: 1px solid rgba(200,112,26,0.2);
-    color: #a85c10;
-    font-size: 0.72rem;
-    font-weight: 600;
-    padding: 0.3rem 0.75rem;
-    border-radius: 20px;
-}
-.status-online {
-    background: #e8f5e8;
-    border: 1px solid rgba(45,122,58,0.2);
-    color: #2d7a3a;
-    font-size: 0.72rem;
-    font-weight: 600;
-    padding: 0.3rem 0.75rem;
-    border-radius: 20px;
-}
-.status-offline {
-    background: #fdecea;
-    border: 1px solid rgba(192,57,43,0.2);
-    color: #c0392b;
-    font-size: 0.72rem;
-    font-weight: 600;
-    padding: 0.3rem 0.75rem;
-    border-radius: 20px;
+.block-container {
+    padding: 2rem 2.5rem 4rem !important;
+    max-width: 1080px !important;
 }
 
-/* ── Section labels ── */
-.section-label {
-    font-size: 0.65rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: #9c8878;
-    margin-bottom: 0.5rem;
-    padding-bottom: 0.4rem;
-    border-bottom: 1px solid #ede5d8;
+#MainMenu, footer, header { visibility: hidden !important; }
+[data-testid="stDecoration"] { display: none !important; }
+
+[data-testid="stSidebar"],
+[data-testid="stSidebar"] > div,
+[data-testid="stSidebar"] section {
+    background-color: #FFFFFF !important;
+    border-right: 1px solid #DBEAFE !important;
+}
+[data-testid="stSidebar"] > div:first-child { padding: 1.5rem 1.25rem 2rem !important; }
+[data-testid="stSidebar"] *, [data-testid="stSidebar"] p,
+[data-testid="stSidebar"] span, [data-testid="stSidebar"] label,
+[data-testid="stSidebar"] div { color: #0F172A !important; }
+
+[data-testid="stRadio"] label {
+    color: #0F172A !important; font-size: 14px !important; font-weight: 500 !important;
+}
+[data-testid="stRadio"] > div { gap: 6px !important; }
+
+textarea, input[type="text"], input[type="search"] {
+    background-color: #FFFFFF !important;
+    color: #0F172A !important;
+    border: 1.5px solid #BFDBFE !important;
+    border-radius: 8px !important;
+    font-family: 'Inter', sans-serif !important;
+    font-size: 14px !important;
+}
+textarea:focus, input:focus {
+    border-color: #2563EB !important;
+    box-shadow: 0 0 0 3px rgba(37,99,235,0.1) !important;
+    outline: none !important;
 }
 
-/* ── Chat messages ── */
-.chat-user {
-    background: linear-gradient(135deg, #c8701a, #a85c10);
-    color: white;
-    border-radius: 14px 14px 4px 14px;
-    padding: 0.85rem 1.1rem;
-    margin: 0.4rem 0;
-    margin-left: 15%;
-    font-size: 0.875rem;
-    line-height: 1.6;
-    box-shadow: 0 2px 8px rgba(200,112,26,0.2);
+[data-testid="stFileUploader"] {
+    background-color: #EFF6FF !important;
+    border: 2px dashed #93C5FD !important;
+    border-radius: 10px !important;
 }
-.chat-label-user {
-    font-size: 0.62rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: #9c8878;
-    text-align: right;
-    margin-right: 0.2rem;
-    margin-bottom: 0.2rem;
-}
-.chat-bot {
-    background: #ffffff;
-    border: 1px solid #ede5d8;
-    border-radius: 14px 14px 14px 4px;
-    padding: 0.85rem 1.1rem;
-    margin: 0.4rem 0;
-    margin-right: 10%;
-    font-size: 0.875rem;
-    line-height: 1.65;
-    color: #1c1612;
-    box-shadow: 0 1px 4px rgba(28,22,18,0.06);
-}
-.chat-label-bot {
-    font-size: 0.62rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: #9c8878;
-    margin-bottom: 0.2rem;
-}
-.chat-meta {
-    margin-top: 0.5rem;
-    padding-top: 0.4rem;
-    border-top: 1px solid #f4efe6;
-    font-size: 0.68rem;
-    color: #9c8878;
-}
-.source-pill {
-    display: inline-block;
-    background: #f5e6d0;
-    border: 1px solid rgba(200,112,26,0.2);
-    color: #a85c10;
-    font-size: 0.65rem;
-    font-weight: 500;
-    padding: 1px 7px;
-    border-radius: 4px;
-    margin: 1px 2px;
-}
+[data-testid="stFileUploader"] * { color: #1D4ED8 !important; }
 
-/* ── Empty state ── */
-.empty-state {
-    text-align: center;
-    padding: 3rem 2rem;
-    color: #9c8878;
-}
-.empty-icon { font-size: 2.5rem; margin-bottom: 0.75rem; }
-.empty-title {
-    font-family: 'Fraunces', serif;
-    font-size: 1.15rem;
-    color: #6b5a47;
-    margin-bottom: 0.4rem;
-}
-.empty-sub { font-size: 0.82rem; line-height: 1.6; max-width: 340px; margin: 0 auto; }
-
-/* ── Example chips ── */
-.chips-row { display: flex; flex-wrap: wrap; gap: 0.4rem; justify-content: center; margin-top: 1rem; }
-.chip-item {
-    background: #ffffff;
-    border: 1px solid #ede5d8;
-    color: #6b5a47;
-    font-size: 0.74rem;
-    padding: 0.4rem 0.9rem;
-    border-radius: 20px;
-    cursor: pointer;
-}
-
-/* ── Panel card ── */
-.panel-card {
-    background: #ffffff;
-    border: 1px solid #ede5d8;
-    border-radius: 10px;
-    padding: 1rem;
-    margin-bottom: 0.75rem;
-    box-shadow: 0 1px 3px rgba(28,22,18,0.05);
-}
-
-/* ── File item ── */
-.file-item {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.45rem 0.7rem;
-    background: #faf7f2;
-    border: 1px solid #ede5d8;
-    border-radius: 6px;
-    margin-top: 0.4rem;
-    font-size: 0.74rem;
-    color: #3d2f22;
-}
-.file-ok { color: #2d7a3a; font-weight: 600; font-size: 0.65rem; }
-.file-err { color: #c0392b; font-weight: 600; font-size: 0.65rem; }
-
-/* Override Streamlit buttons */
-.stButton > button {
-    background: #c8701a !important;
-    color: white !important;
+[data-testid="stBaseButton-secondary"], button[kind="secondary"] {
+    background-color: #2563EB !important;
+    color: #FFFFFF !important;
     border: none !important;
     border-radius: 8px !important;
-    font-family: 'Instrument Sans', sans-serif !important;
     font-weight: 600 !important;
-    font-size: 0.8rem !important;
-    padding: 0.5rem 1rem !important;
-    width: 100% !important;
-    box-shadow: 0 2px 8px rgba(200,112,26,0.25) !important;
-    transition: all 0.15s !important;
+    font-size: 14px !important;
+    font-family: 'Inter', sans-serif !important;
 }
-.stButton > button:hover {
-    background: #a85c10 !important;
-    box-shadow: 0 4px 12px rgba(200,112,26,0.35) !important;
-}
+[data-testid="stBaseButton-secondary"]:hover { background-color: #1D4ED8 !important; }
 
-/* Danger button */
-.danger-btn > button {
+[data-testid="stTabs"] { background: transparent !important; }
+[data-baseweb="tab-list"] {
     background: transparent !important;
-    color: #9c8878 !important;
-    border: 1px solid #ede5d8 !important;
-    box-shadow: none !important;
-    font-size: 0.74rem !important;
+    border-bottom: 2px solid #DBEAFE !important;
+    gap: 0 !important;
 }
-.danger-btn > button:hover {
-    color: #c0392b !important;
-    border-color: #c0392b !important;
-    background: #fdecea !important;
+[data-baseweb="tab"] {
+    background: transparent !important;
+    color: #64748B !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    padding: 0.6rem 1.25rem !important;
+    border-bottom: 2px solid transparent !important;
+    margin-bottom: -2px !important;
 }
+[data-baseweb="tab"][aria-selected="true"] {
+    color: #2563EB !important;
+    border-bottom: 2px solid #2563EB !important;
+}
+[data-baseweb="tab-highlight"], [data-baseweb="tab-border"] { display: none !important; }
+[data-testid="stTabsContent"] { background: transparent !important; padding-top: 1.5rem !important; }
 
-/* Input overrides */
-.stTextInput > div > div > input,
-.stTextArea > div > div > textarea {
-    background: #ffffff !important;
-    border: 1px solid #ede5d8 !important;
+[data-testid="stChatMessage"] {
+    background-color: #FFFFFF !important;
+    border: 1px solid #DBEAFE !important;
+    border-radius: 10px !important;
+    padding: 0.9rem 1.1rem !important;
+    margin-bottom: 0.75rem !important;
+}
+[data-testid="stChatMessage"] * { color: #0F172A !important; }
+
+/* Fix chat input — force light */
+[data-testid="stChatInput"],
+[data-testid="stChatInput"] > div,
+[data-testid="stChatInput"] textarea {
+    background-color: #FFFFFF !important;
+    color: #0F172A !important;
+    border: 1.5px solid #BFDBFE !important;
+    border-radius: 10px !important;
+}
+[data-testid="stChatInput"] button {
+    background-color: #2563EB !important;
     border-radius: 8px !important;
-    color: #1c1612 !important;
-    font-family: 'Instrument Sans', sans-serif !important;
 }
-.stTextInput > div > div > input:focus,
-.stTextArea > div > div > textarea:focus {
-    border-color: #c8701a !important;
-    box-shadow: 0 0 0 3px rgba(200,112,26,0.12) !important;
+[data-testid="stBottomBlockContainer"],
+[data-testid="stBottomBlockContainer"] > div {
+    background-color: #F0F4FF !important;
 }
 
-/* Sidebar */
-section[data-testid="stSidebar"] {
-    background: #ffffff !important;
-    border-right: 1px solid #ede5d8 !important;
-}
-section[data-testid="stSidebar"] .block-container {
-    padding: 1rem 0.75rem !important;
-}
-
-/* File uploader */
-[data-testid="stFileUploader"] {
-    background: #faf7f2 !important;
-    border: 1.5px dashed #d4c5b0 !important;
+[data-testid="stAlert"] { border-radius: 8px !important; font-size: 14px !important; }
+[data-testid="stExpander"] {
+    background-color: #FFFFFF !important;
+    border: 1px solid #DBEAFE !important;
     border-radius: 8px !important;
 }
+
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: #F0F4FF; }
+::-webkit-scrollbar-thumb { background: #BFDBFE; border-radius: 10px; }
+hr { border: none !important; border-top: 1px solid #DBEAFE !important; }
 </style>
 """, unsafe_allow_html=True)
 
 
-# ── Helper functions ──────────────────────────────────────────────────────────
+# ── Standalone bootstrap ───────────────────────────────────────────────────────
+if STANDALONE:
+    os.environ["PERSIST_INDEX"] = "false"
+    ROOT = Path(__file__).resolve().parent
+    if str(ROOT) not in sys.path:
+        sys.path.insert(0, str(ROOT))
+    import backend.rag_engine as engine
+    if "rag_index" not in st.session_state:
+        import faiss as _faiss
+        st.session_state.rag_index    = _faiss.IndexFlatIP(engine.EMBED_DIM)
+        st.session_state.rag_metadata = []
+        engine._index    = st.session_state.rag_index
+        engine._metadata = st.session_state.rag_metadata
+    else:
+        engine._index    = st.session_state.rag_index
+        engine._metadata = st.session_state.rag_metadata
+
+
+def _api(method, path, **kwargs):
+    import requests
+    try:
+        r = requests.request(method, f"{API_URL}{path}", timeout=60, **kwargs)
+        r.raise_for_status()
+        return r.json()
+    except requests.exceptions.ConnectionError:
+        st.error(f"Cannot reach backend at {API_URL}. Run: uvicorn backend.api:app --reload --port 8000")
+        st.stop()
 
 def get_stats():
-    try:
-        r = requests.get(f"{API}/stats", timeout=3)
-        return r.json() if r.ok else None
-    except Exception:
-        return None
-
-def ingest_pdf_file(file_bytes, filename, strategy):
-    try:
-        r = requests.post(
-            f"{API}/ingest/pdf",
-            files={"file": (filename, file_bytes, "application/pdf")},
-            data={"strategy": strategy},
-            timeout=60
-        )
-        return r.json()
-    except Exception as e:
-        return {"error": str(e)}
-
-def ingest_text_content(text, source, strategy):
-    try:
-        r = requests.post(
-            f"{API}/ingest/text",
-            json={"text": text, "source": source, "strategy": strategy},
-            timeout=30
-        )
-        return r.json()
-    except Exception as e:
-        return {"error": str(e)}
-
-def query_rag(question, history):
-    try:
-        r = requests.post(
-            f"{API}/query",
-            json={"query": question, "chat_history": history},
-            timeout=60
-        )
-        return r.json()
-    except Exception as e:
-        return {"error": str(e)}
-
-def clear_index():
-    try:
-        r = requests.delete(f"{API}/clear", timeout=10)
-        return r.json()
-    except Exception as e:
-        return {"error": str(e)}
+    return engine.get_stats() if STANDALONE else _api("GET", "/stats")
 
 
-# ── Session state ─────────────────────────────────────────────────────────────
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
-if "api_history" not in st.session_state:
-    st.session_state.api_history = []
-if "indexed_files" not in st.session_state:
-    st.session_state.indexed_files = []
+# ══════════════════════════════════════════════════════════════════════════════
+# SIDEBAR
+# ══════════════════════════════════════════════════════════════════════════════
+with st.sidebar:
 
-
-# ── Fetch stats ───────────────────────────────────────────────────────────────
-stats = get_stats()
-api_online = stats is not None
-
-
-# ── Header ────────────────────────────────────────────────────────────────────
-api_status = "🟢 API Online" if api_online else "🔴 API Offline"
-chunks = stats["total_chunks"] if stats else 0
-docs = stats["total_documents"] if stats else 0
-
-st.markdown(f"""
-<div class="docmind-header">
-    <div>
-        <div class="docmind-logo">📖 Doc<span>Mind</span></div>
-        <div class="docmind-tagline">RAG Document Intelligence · Powered by Groq Llama 3 (Free)</div>
+    # Logo
+    st.markdown("""
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:1.75rem;">
+        <div style="width:36px;height:36px;background:linear-gradient(135deg,#2563EB,#60A5FA);
+                    border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px;">🧠</div>
+        <div>
+            <div style="font-size:15px;font-weight:600;color:#0F172A;">DocMind</div>
+            <div style="font-size:11px;color:#64748B;">RAG Document Intelligence</div>
+        </div>
     </div>
-    <div class="stat-row">
-        <span class="{'status-online' if api_online else 'status-offline'}">{api_status}</span>
-        <span class="stat-badge">⬡ {chunks} chunks</span>
-        <span class="stat-badge">📄 {docs} docs</span>
+    """, unsafe_allow_html=True)
+
+    # Step indicator
+    stats        = get_stats()
+    total_chunks = stats.get("total_chunks", 0)
+    total_docs   = stats.get("total_documents", 0)
+    sources      = stats.get("sources", [])
+
+    step1_done = total_chunks > 0
+    st.markdown(f"""
+    <div style="margin-bottom:1.25rem;">
+        <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;
+                    background:{'#EFF6FF' if step1_done else '#F8FAFC'};
+                    border:1px solid {'#BFDBFE' if step1_done else '#E2E8F0'};
+                    border-radius:7px;margin-bottom:6px;">
+            <div style="width:20px;height:20px;border-radius:50%;background:{'#2563EB' if step1_done else '#CBD5E1'};
+                        display:flex;align-items:center;justify-content:center;
+                        font-size:11px;font-weight:700;color:#fff;flex-shrink:0;">
+                {'✓' if step1_done else '1'}
+            </div>
+            <div style="font-size:12.5px;font-weight:500;color:{'#1D4ED8' if step1_done else '#64748B'};">
+                {'Document indexed' if step1_done else 'Upload a document'}
+            </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;
+                    background:{'#EFF6FF' if step1_done else '#F8FAFC'};
+                    border:1px solid {'#BFDBFE' if step1_done else '#E2E8F0'};
+                    border-radius:7px;">
+            <div style="width:20px;height:20px;border-radius:50%;background:{'#2563EB' if step1_done else '#CBD5E1'};
+                        display:flex;align-items:center;justify-content:center;
+                        font-size:11px;font-weight:700;color:#fff;flex-shrink:0;">2</div>
+            <div style="font-size:12.5px;font-weight:500;color:{'#1D4ED8' if step1_done else '#64748B'};">
+                Ask questions in Chat
+            </div>
+        </div>
     </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("<hr>", unsafe_allow_html=True)
+
+    # Chunking strategy
+    st.markdown('<div style="font-size:10.5px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#2563EB;margin:0.75rem 0 0.5rem;">Chunking Strategy</div>', unsafe_allow_html=True)
+
+    strategy = st.radio(
+        "strategy_radio",
+        options=["fixed", "sentence"],
+        format_func=lambda x: "Fixed (500 chars)" if x == "fixed" else "Sentence-aware  ✦ recommended",
+        label_visibility="collapsed",
+    )
+
+    if strategy == "fixed":
+        st.markdown('<div style="background:#F8FAFC;border-left:3px solid #94A3B8;border-radius:0 6px 6px 0;padding:7px 10px;font-size:12px;color:#475569;line-height:1.5;margin-top:4px;">Splits every 500 chars. Fast, may cut sentences mid-way.</div>', unsafe_allow_html=True)
+    else:
+        st.markdown('<div style="background:#EFF6FF;border-left:3px solid #2563EB;border-radius:0 6px 6px 0;padding:7px 10px;font-size:12px;color:#1E40AF;line-height:1.5;margin-top:4px;">Complete sentences, semantic overlap. <strong>+10% Recall@3</strong> on benchmark.</div>', unsafe_allow_html=True)
+
+    st.markdown("<hr style='margin:1rem 0;'>", unsafe_allow_html=True)
+
+    # Index stats
+    st.markdown('<div style="font-size:10.5px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#2563EB;margin-bottom:0.6rem;">Index</div>', unsafe_allow_html=True)
+    st.markdown(f"""
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:0.6rem;">
+        <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:9px 12px;">
+            <div style="font-size:20px;font-weight:600;color:#1D4ED8;font-family:monospace;">{total_chunks}</div>
+            <div style="font-size:10px;color:#3B82F6;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Chunks</div>
+        </div>
+        <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:9px 12px;">
+            <div style="font-size:20px;font-weight:600;color:#1D4ED8;font-family:monospace;">{total_docs}</div>
+            <div style="font-size:10px;color:#3B82F6;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Docs</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    if sources:
+        tags = "".join(f'<span style="display:inline-block;font-size:10.5px;background:#DBEAFE;color:#1E40AF;border-radius:4px;padding:2px 7px;margin:2px 2px 0 0;font-family:monospace;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{s}</span>' for s in sources)
+        st.markdown(f'<div style="margin-bottom:0.5rem;">{tags}</div>', unsafe_allow_html=True)
+
+    st.markdown("<hr style='margin:0.75rem 0;'>", unsafe_allow_html=True)
+
+    if st.button("🗑  Clear index", use_container_width=True):
+        if STANDALONE:
+            engine.clear_index()
+            st.session_state.rag_index    = engine._index
+            st.session_state.rag_metadata = engine._metadata
+        else:
+            _api("DELETE", "/clear")
+        st.session_state.chat_history = []
+        st.rerun()
+
+    st.markdown("<div style='height:0.75rem'></div>", unsafe_allow_html=True)
+    badge_bg  = "#D1FAE5" if STANDALONE else "#DBEAFE"
+    badge_col = "#065F46" if STANDALONE else "#1E40AF"
+    badge_txt = "Standalone mode" if STANDALONE else f"Connected · {API_URL}"
+    st.markdown(f'<div style="font-size:11px;font-weight:500;background:{badge_bg};color:{badge_col};padding:4px 10px;border-radius:5px;display:inline-block;">● {badge_txt}</div>', unsafe_allow_html=True)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# HEADER
+# ══════════════════════════════════════════════════════════════════════════════
+st.markdown("""
+<div style="border-bottom:2px solid #DBEAFE;padding-bottom:1rem;margin-bottom:1.5rem;">
+    <h1 style="font-size:26px;font-weight:600;color:#0F172A;letter-spacing:-0.03em;margin:0 0 5px;">DocMind</h1>
+    <p style="font-size:13.5px;color:#64748B;margin:0;line-height:1.55;">
+        Upload a document → choose a chunking strategy → ask questions.
+        Answers are grounded in your document and cited using
+        <strong style="color:#1D4ED8;">Llama 3.3 70B via Groq</strong>.
+    </p>
 </div>
 """, unsafe_allow_html=True)
 
-if not api_online:
-    st.error("⚠️ Backend not running. Open a terminal and run: `uvicorn backend.api:app --reload --port 8000`")
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TABS
+# ══════════════════════════════════════════════════════════════════════════════
+tab_ingest, tab_chat = st.tabs(["📄  Step 1 — Ingest document", "💬  Step 2 — Chat"])
 
 
-# ── Layout ────────────────────────────────────────────────────────────────────
-sidebar, main_col = st.columns([1, 2.5])
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 1 — INGEST
+# ══════════════════════════════════════════════════════════════════════════════
+with tab_ingest:
 
+    col1, col2 = st.columns(2, gap="large")
 
-# ── SIDEBAR ───────────────────────────────────────────────────────────────────
-with sidebar:
+    # LEFT — PDF
+    with col1:
+        st.markdown('<div style="font-size:13px;font-weight:600;color:#0F172A;margin-bottom:0.6rem;">Upload a PDF <span style="font-size:11px;font-weight:400;color:#94A3B8;">· max 20 MB</span></div>', unsafe_allow_html=True)
+        uploaded = st.file_uploader("pdf", type=["pdf"], label_visibility="collapsed")
 
-    st.markdown('<div class="section-label">Chunking Strategy</div>', unsafe_allow_html=True)
-    strategy_label = st.selectbox(
-        "Chunking Strategy",
-        ["Fixed", "Sentence-Aware"],
-        label_visibility="collapsed",
-        help="Fixed uses overlapping character windows. Sentence-Aware keeps complete sentences together.",
-    )
-    chunking_strategy = "fixed" if strategy_label == "Fixed" else "sentence"
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    # PDF Upload
-    st.markdown('<div class="section-label">📄 Upload PDF</div>', unsafe_allow_html=True)
-    uploaded_file = st.file_uploader(
-        "Drop PDF here",
-        type=["pdf"],
-        label_visibility="collapsed"
-    )
-
-    if uploaded_file:
-        if st.button("📤 Index This PDF"):
-            if not api_online:
-                st.error("API is offline.")
-            else:
-                with st.spinner(f"Indexing {uploaded_file.name}..."):
-                    result = ingest_pdf_file(
-                        uploaded_file.read(),
-                        uploaded_file.name,
-                        chunking_strategy,
-                    )
-                if "error" in result:
-                    st.error(f"Failed: {result['error']}")
-                    st.session_state.indexed_files.append({"name": uploaded_file.name, "status": "error", "chunks": 0})
-                else:
-                    st.success(f"✅ {result['chunks_added']} chunks indexed!")
-                    st.session_state.indexed_files.append({"name": uploaded_file.name, "status": "ok", "chunks": result['chunks_added']})
-                    st.rerun()
-
-    # Show indexed files
-    if st.session_state.indexed_files:
-        for f in st.session_state.indexed_files[-5:]:
-            icon = "✓" if f["status"] == "ok" else "✗"
-            cls = "file-ok" if f["status"] == "ok" else "file-err"
-            st.markdown(f"""
-            <div class="file-item">
-                📄 <span style="flex:1;overflow:hidden;text-overflow:ellipsis;">{f['name']}</span>
-                <span class="{cls}">{icon} {f['chunks']} chunks</span>
-            </div>""", unsafe_allow_html=True)
-
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    # Text ingest
-    st.markdown('<div class="section-label">✏️ Paste Text</div>', unsafe_allow_html=True)
-    source_name = st.text_input("Source name", value="notes", placeholder="e.g. lecture_notes")
-    text_input = st.text_area("Content", height=100, placeholder="Paste any text here…", label_visibility="collapsed")
-
-    if st.button("📤 Index Text"):
-        if not api_online:
-            st.error("API is offline.")
-        elif len(text_input.strip()) < 50:
-            st.warning("Text too short (min 50 characters)")
+        if uploaded:
+            kb = len(uploaded.getvalue()) / 1024
+            st.markdown(f'<div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:7px;padding:7px 12px;font-size:12px;color:#1E40AF;font-family:monospace;margin:6px 0;">{uploaded.name} · {kb:.1f} KB</div>', unsafe_allow_html=True)
+            if st.button("Ingest PDF →", use_container_width=True, key="btn_pdf"):
+                with st.spinner(f"Processing with {strategy} chunking…"):
+                    if STANDALONE:
+                        result = engine.ingest_pdf_bytes(uploaded.read(), uploaded.name, strategy=strategy)
+                    else:
+                        result = _api("POST", f"/ingest/pdf?strategy={strategy}",
+                                      files={"file": (uploaded.name, uploaded.getvalue(), "application/pdf")})
+                st.success(f"✓ {result.get('chunks_added','?')} chunks added · {result.get('strategy', strategy)} chunking · now go to Chat →")
+                st.rerun()
         else:
-            with st.spinner("Indexing..."):
-                result = ingest_text_content(text_input, source_name, chunking_strategy)
-            if "error" in result:
-                st.error(result["error"])
+            st.markdown('<div style="text-align:center;padding:1.25rem;color:#93C5FD;font-size:13px;">Drop a PDF here or click Browse files</div>', unsafe_allow_html=True)
+
+    # RIGHT — Text
+    with col2:
+        st.markdown('<div style="font-size:13px;font-weight:600;color:#0F172A;margin-bottom:0.6rem;">Paste text <span style="font-size:11px;font-weight:400;color:#94A3B8;">· min 50 chars</span></div>', unsafe_allow_html=True)
+        raw_text = st.text_area("text", placeholder="Paste an article, documentation, notes, or any text here…", height=130, label_visibility="collapsed")
+        source   = st.text_input("source", value="pasted_text", placeholder="Source label", label_visibility="collapsed")
+        if st.button("Ingest text →", use_container_width=True, key="btn_text"):
+            if len(raw_text.strip()) < 50:
+                st.warning("Paste at least 50 characters.")
             else:
-                st.success(f"✅ {result['chunks_added']} chunks indexed!")
-                st.session_state.indexed_files.append({"name": source_name, "status": "ok", "chunks": result['chunks_added']})
+                with st.spinner(f"Processing with {strategy} chunking…"):
+                    if STANDALONE:
+                        result = engine.ingest_text(raw_text, source=source, strategy=strategy)
+                    else:
+                        result = _api("POST", f"/ingest/text?strategy={strategy}",
+                                      json={"text": raw_text, "source": source})
+                st.success(f"✓ {result.get('chunks_added','?')} chunks added · {result.get('strategy', strategy)} chunking · now go to Chat →")
                 st.rerun()
 
-    st.markdown("<br>", unsafe_allow_html=True)
+    # Benchmark — collapsed by default, visible but not intrusive
+    st.markdown("<div style='height:1rem'></div>", unsafe_allow_html=True)
+    st.markdown('<div style="font-size:10.5px;font-weight:600;letter-spacing:0.09em;text-transform:uppercase;color:#3B82F6;margin-bottom:0.6rem;">Retrieval Benchmark</div>', unsafe_allow_html=True)
+    bc1, bc2, bc3 = st.columns(3)
+    with bc1:
+        st.markdown('<div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:10px 14px;text-align:center;"><div style="font-size:9.5px;font-weight:600;text-transform:uppercase;color:#94A3B8;letter-spacing:0.06em;margin-bottom:4px;">Fixed · Recall@3</div><div style="font-size:24px;font-weight:600;color:#64748B;font-family:monospace;">70%</div></div>', unsafe_allow_html=True)
+    with bc2:
+        st.markdown('<div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:10px 14px;text-align:center;"><div style="font-size:9.5px;font-weight:600;text-transform:uppercase;color:#60A5FA;letter-spacing:0.06em;margin-bottom:4px;">Sentence · Recall@3</div><div style="font-size:24px;font-weight:600;color:#1D4ED8;font-family:monospace;">80%</div></div>', unsafe_allow_html=True)
+    with bc3:
+        st.markdown('<div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:10px 14px;text-align:center;"><div style="font-size:9.5px;font-weight:600;text-transform:uppercase;color:#60A5FA;letter-spacing:0.06em;margin-bottom:4px;">Sentence · Recall@5</div><div style="font-size:24px;font-weight:600;color:#1D4ED8;font-family:monospace;">90%</div></div>', unsafe_allow_html=True)
+    st.markdown('<div style="font-size:11px;color:#94A3B8;margin-top:0.6rem;">Run <code style="background:#F1F5F9;color:#475569;padding:1px 5px;border-radius:3px;font-size:10.5px;">python eval/run_eval.py --verbose</code> to reproduce · no API keys needed</div>', unsafe_allow_html=True)
 
-    # Indexed sources
-    if stats and stats["sources"]:
-        st.markdown('<div class="section-label">🗂 Indexed Sources</div>', unsafe_allow_html=True)
-        for src in stats["sources"]:
-            st.markdown(f'<div class="file-item">📄 {src}</div>', unsafe_allow_html=True)
-        st.markdown("<br>", unsafe_allow_html=True)
 
-    # Clear
-    st.markdown('<div class="danger-btn">', unsafe_allow_html=True)
-    if st.button("🗑 Clear All Documents"):
-        clear_index()
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 2 — CHAT
+# ══════════════════════════════════════════════════════════════════════════════
+with tab_chat:
+
+    if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
-        st.session_state.api_history = []
-        st.session_state.indexed_files = []
-        st.success("Cleared!")
-        st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
 
-
-# ── MAIN CHAT ─────────────────────────────────────────────────────────────────
-def render_conversation():
-
-    st.markdown('<div class="section-label">💬 Conversation</div>', unsafe_allow_html=True)
-
-    # Chat messages
-    if not st.session_state.chat_history:
+    # Empty state — no docs
+    if total_chunks == 0:
         st.markdown("""
-        <div class="empty-state">
-            <div class="empty-icon">💬</div>
-            <div class="empty-title">Start a conversation</div>
-            <div class="empty-sub">Upload a PDF or paste text in the sidebar, then ask anything about it.</div>
-            <div class="chips-row">
-                <span class="chip-item">Summarize the main points</span>
-                <span class="chip-item">What are the key findings?</span>
-                <span class="chip-item">List all topics covered</span>
-                <span class="chip-item">Give me a brief overview</span>
+        <div style="text-align:center;padding:3rem 1rem;border:2px dashed #BFDBFE;
+                    border-radius:12px;background:#F8FBFF;">
+            <div style="font-size:30px;margin-bottom:0.6rem;">📭</div>
+            <div style="font-size:15px;font-weight:600;color:#1E40AF;margin-bottom:6px;">No documents yet</div>
+            <div style="font-size:13px;color:#64748B;line-height:1.6;">
+                Go to <strong>Step 1 — Ingest document</strong>, upload a PDF or paste text,
+                then come back here to ask questions.
             </div>
         </div>
         """, unsafe_allow_html=True)
+
     else:
+        # Ready state — no chat yet
+        if not st.session_state.chat_history:
+            st.markdown(f"""
+            <div style="text-align:center;padding:2rem 1rem;border:1px solid #BFDBFE;
+                        border-radius:10px;background:#EFF6FF;margin-bottom:1rem;">
+                <div style="font-size:24px;margin-bottom:0.5rem;">🔍</div>
+                <div style="font-size:14px;font-weight:600;color:#1D4ED8;margin-bottom:3px;">
+                    Ready · {total_chunks} chunks indexed across {total_docs} document{'s' if total_docs != 1 else ''}
+                </div>
+                <div style="font-size:12.5px;color:#3B82F6;">Type your question below to get started.</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        # Chat history
         for msg in st.session_state.chat_history:
-            if msg["role"] == "user":
-                st.markdown(f"""
-                <div class="chat-label-user">YOU</div>
-                <div class="chat-user">{msg['content']}</div>
-                """, unsafe_allow_html=True)
-            else:
-                sources_html = "".join(
-                    f'<span class="source-pill">📄 {s}</span>'
-                    for s in msg.get("sources", [])
-                )
-                meta = f'<div class="chat-meta">⬡ {msg.get("chunks_used", 0)} chunks retrieved &nbsp;·&nbsp; {sources_html}</div>' if msg.get("sources") else ""
-                content = msg["content"].replace("\n", "<br>")
-                st.markdown(f"""
-                <div class="chat-label-bot">DOCMIND</div>
-                <div class="chat-bot">{content}{meta}</div>
-                """, unsafe_allow_html=True)
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
+                if msg["role"] == "assistant" and msg.get("sources"):
+                    chips = "".join(
+                        f'<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;'
+                        f'background:#EFF6FF;color:#1E40AF;border:1px solid #BFDBFE;border-radius:4px;'
+                        f'padding:2px 7px;margin:3px 2px 0 0;font-family:monospace;">'
+                        f'<span style="width:5px;height:5px;background:#3B82F6;border-radius:50%;display:inline-block;"></span>{s}</span>'
+                        for s in msg["sources"]
+                    )
+                    st.markdown(
+                        f'<div style="margin-top:8px;">{chips}'
+                        f'<span style="font-size:11px;color:#94A3B8;margin-left:6px;">'
+                        f'{msg.get("chunks_used","")} chunks retrieved</span></div>',
+                        unsafe_allow_html=True,
+                    )
 
-    st.markdown("<br>", unsafe_allow_html=True)
+        # Input
+        if question := st.chat_input("Ask a question about your document…"):
+            st.session_state.chat_history.append({"role": "user", "content": question})
+            with st.chat_message("user"):
+                st.markdown(question)
 
-    # Query input
-    col_input, col_btn = st.columns([5, 1])
-    with col_input:
-        user_query = st.text_input(
-            "Ask a question",
-            placeholder="Ask anything about your documents…",
-            label_visibility="collapsed",
-            key="query_input"
-        )
-    with col_btn:
-        ask = st.button("Ask →")
+            with st.chat_message("assistant"):
+                with st.spinner("Retrieving and generating…"):
+                    if STANDALONE:
+                        chunks      = engine.retrieve(question)
+                        answer      = engine.generate_answer(question, chunks,
+                                        chat_history=st.session_state.chat_history[:-1])
+                        sources     = list({c["source"] for c in chunks})
+                        chunks_used = len(chunks)
+                    else:
+                        data        = _api("POST", "/query", json={
+                                        "query": question,
+                                        "chat_history": st.session_state.chat_history[:-1]})
+                        answer      = data.get("answer", "No answer returned.")
+                        sources     = data.get("sources", [])
+                        chunks_used = data.get("chunks_used", 0)
 
-    # Example chips as buttons
-    if not st.session_state.chat_history:
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            if st.button("Summarize main points"):
-                user_query = "Summarize the main points"
-                ask = True
-        with c2:
-            if st.button("What are key findings?"):
-                user_query = "What are the key findings?"
-                ask = True
-        with c3:
-            if st.button("List all topics covered"):
-                user_query = "List all topics covered"
-                ask = True
+                st.markdown(answer)
+                if sources:
+                    chips = "".join(
+                        f'<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;'
+                        f'background:#EFF6FF;color:#1E40AF;border:1px solid #BFDBFE;border-radius:4px;'
+                        f'padding:2px 7px;margin:3px 2px 0 0;font-family:monospace;">'
+                        f'<span style="width:5px;height:5px;background:#3B82F6;border-radius:50%;display:inline-block;"></span>{s}</span>'
+                        for s in sources
+                    )
+                    st.markdown(
+                        f'<div style="margin-top:8px;">{chips}'
+                        f'<span style="font-size:11px;color:#94A3B8;margin-left:6px;">{chunks_used} chunks retrieved</span></div>',
+                        unsafe_allow_html=True,
+                    )
 
-    # Process query
-    if ask and user_query:
-        if not api_online:
-            st.error("Start the backend first!")
-        else:
-            with st.spinner("Thinking…"):
-                result = query_rag(user_query, st.session_state.api_history)
-
-            if "error" in result:
-                st.error(f"Error: {result['error']}")
-            else:
-                st.session_state.chat_history.append({"role": "user", "content": user_query})
-                st.session_state.chat_history.append({
-                    "role": "assistant",
-                    "content": result["answer"],
-                    "sources": result.get("sources", []),
-                    "chunks_used": result.get("chunks_used", 0)
-                })
-                st.session_state.api_history.append({"role": "user", "content": user_query})
-                st.session_state.api_history.append({"role": "assistant", "content": result["answer"]})
-                if len(st.session_state.api_history) > 12:
-                    st.session_state.api_history = st.session_state.api_history[-12:]
-                st.rerun()
-
-
-with main_col:
-    conversation_tab, benchmark_tab = st.tabs(["Conversation", "📊 Benchmark"])
-
-    with conversation_tab:
-        render_conversation()
-
-    with benchmark_tab:
-        results_path = Path("eval/eval_results.md")
-        if results_path.exists():
-            st.markdown(results_path.read_text(encoding="utf-8"))
-        else:
-            st.info("Run `python eval/run_eval.py` to generate benchmark results.")
+            st.session_state.chat_history.append({
+                "role": "assistant", "content": answer,
+                "sources": sources, "chunks_used": chunks_used,
+            })

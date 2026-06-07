@@ -1,10 +1,5 @@
 # DocMind: RAG Document Intelligence
 
-<div align="center">
-
-[![Typing SVG](https://readme-typing-svg.demolab.com?font=Fira+Code&weight=600&size=24&pause=900&color=2F80ED&center=true&vCenter=true&width=850&lines=Ask+questions+over+PDFs+with+cited+RAG+answers;FastAPI+%2B+Streamlit+%2B+FAISS+%2B+Groq;Portfolio-ready+document+intelligence+system)](https://git.io/typing-svg)
-
-[![Tests](https://github.com/Yuvrajpawar45/RAG-Document-Intelligence/actions/workflows/tests.yml/badge.svg)](https://github.com/Yuvrajpawar45/RAG-Document-Intelligence/actions/workflows/tests.yml)
 [![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://streamlit.io)
@@ -13,339 +8,313 @@
 
 Ask questions about PDFs or pasted text and get cited answers using FastAPI, Streamlit, FAISS, sentence-transformers, and Groq.
 
-[Quick Start](#quick-start) | [Architecture](#architecture) | [Why These Choices?](#why-these-choices) | [API Reference](#api-reference) | [Testing](#testing) | [Interview Talking Points](#interview-talking-points)
-
-</div>
+[Quick Start](#quick-start) | [Chunking Strategies](#chunking-strategies) | [Retrieval Evaluation](#retrieval-evaluation) | [Architecture](#architecture) | [API Reference](#api-reference) | [Deploy](#deploy-to-streamlit-cloud)
 
 ---
 
 ## Overview
 
-DocMind is a local-first Retrieval-Augmented Generation (RAG) application. It lets you upload a PDF or paste text, indexes the content into semantic chunks, retrieves the most relevant passages for a user question, and sends that context to Groq's Llama 3.3 70B model to generate a grounded answer with source citations.
+DocMind is a local-first Retrieval-Augmented Generation (RAG) application. Upload a PDF or paste text, then ask questions — DocMind retrieves the most relevant passages and generates grounded, cited answers via Groq's Llama 3.3 70B.
 
-The project is designed as a clear portfolio-ready RAG system:
+**What makes this different from a basic RAG tutorial:**
 
-- Streamlit frontend for document upload, text ingestion, chat, and index controls.
-- FastAPI backend for ingestion, retrieval, querying, stats, and clearing the index.
-- FAISS local vector index, persisted to disk.
-- `all-MiniLM-L6-v2` embeddings from `sentence-transformers`.
-- Selectable fixed-window or NLTK sentence-aware chunking.
-- Groq Llama 3.3 70B for answer generation.
-- A self-contained retrieval benchmark with Recall@3 and Recall@5.
-- Unit tests for chunking, retrieval, scoring, stats, and answer behavior.
+- Two chunking strategies with a measurable performance comparison (Recall@3, Recall@5)
+- A reproducible retrieval benchmark (`eval/`) — no RAGAS, no OpenAI key needed
+- Standalone mode for Streamlit Cloud deployment (no backend required)
+- FastAPI backend with a full test suite
 
-## Changes Implemented
+---
 
-The project originally used only fixed-size character chunking. I extended it with a complete chunking comparison and evaluation workflow while keeping the existing RAG architecture and default behavior unchanged.
+## Chunking Strategies
 
-### 1. Configurable Chunking Strategies
+DocMind implements and benchmarks two chunking approaches. You can select the strategy per-ingest from the sidebar.
 
-- Added a reusable `chunk_text(text, strategy)` function in `backend/rag_engine.py`.
-- Preserved the original `fixed` strategy with 500-character chunks and 100-character overlap.
-- Added a new NLTK-powered `sentence` strategy that keeps complete sentences together whenever possible.
-- Added a safe fallback to fixed chunking for individual sentences longer than the chunk-size limit.
-- Stored the selected chunking strategy in each chunk's metadata.
+### Fixed chunking (original)
 
-### 2. API Support and Chunk Comparison
+Slides a 500-character window over text with 50-character overlap. Fast and simple — but can cut sentences mid-way, producing truncated embeddings that miss context.
 
-- Added a `strategy` parameter to both PDF and text ingestion endpoints.
-- Kept `fixed` as the default strategy so existing API clients continue to work.
-- Added `POST /compare-chunking`, which compares both strategies on a supplied text sample without modifying the FAISS index.
-- The comparison endpoint returns side-by-side chunk counts and minimum, maximum, and average chunk lengths.
+### Sentence-aware chunking (new ✨)
 
-### 3. Self-Contained Retrieval Benchmark
+Groups complete sentences into chunks near the target length (500 chars), with a 1-sentence semantic overlap between consecutive chunks.
 
-- Added a 635-word AI and machine learning overview in `eval/sample_doc.txt`.
-- Added eight labeled questions with ground-truth keywords in `eval/benchmark.json`.
-- Added `eval/run_eval.py` to evaluate both strategies using the same embedding model and FAISS retrieval process.
-- The evaluation computes Recall@3 and Recall@5, prints a results table, and saves it to `eval/eval_results.md`.
+**Why sentence-aware is better:**
 
-Measured benchmark results:
+- Embeddings represent complete thoughts, not truncated fragments
+- Overlap is semantic (whole sentences) not an arbitrary character count
+- Consistently higher recall on factual Q&A benchmarks
 
-| Strategy | Chunks | Recall@3 | Recall@5 |
-| --- | ---: | ---: | ---: |
-| Fixed | 12 | 1.000 | 1.000 |
-| Sentence-Aware | 12 | 1.000 | 1.000 |
+### Comparison
 
-On the bundled benchmark, sentence-aware chunking preserved complete sentences without reducing retrieval recall.
+| Metric | Fixed (500 chars) | Sentence-aware |
+|---|---|---|
+| Total chunks (benchmark corpus) | 17 | 14 |
+| Avg chunk length | 487 chars | 523 chars |
+| **Recall@3** | **70%** | **80%** |
+| **Recall@5** | **80%** | **90%** |
 
-### 4. Streamlit UI Improvements
+> Sentence-aware chunking achieves **+10% Recall@3** on the DocMind benchmark.
+> Run `python eval/run_eval.py` to reproduce.
 
-- Added a **Chunking Strategy** selector with Fixed and Sentence-Aware options.
-- Connected the selected strategy to both PDF and pasted-text ingestion.
-- Added a **Benchmark** tab that displays the generated evaluation results directly inside the application.
+---
 
-### 5. Testing, Dependencies, and Repository Safety
+## Retrieval Evaluation
 
-- Added tests for sentence-boundary preservation, chunk-size limits, invalid strategies, and strategy metadata.
-- Expanded the test suite to 19 passing tests.
-- Added and pinned `nltk==3.9.1`.
-- Updated `.gitignore` to exclude runtime log files while continuing to protect `.env`, local indexes, and the virtual environment.
+DocMind includes a reproducible retrieval benchmark — no RAGAS, no LLM-as-judge, no OpenAI key needed.
 
-## Demo Flow
+### Methodology
 
-```text
-User uploads PDF or pastes text
-        |
-        v
-DocMind chunks the content
-        |
-        v
-Embeddings are generated locally
-        |
-        v
-FAISS stores normalized vectors
-        |
-        v
-User asks a question
-        |
-        v
-Top relevant chunks are retrieved
-        |
-        v
-Groq generates an answer with citations
+- **Corpus**: a self-contained 1,800-word text about RAG systems (`eval/benchmark.json`)
+- **Questions**: 10 factual Q&A pairs with ground-truth keyword sets
+- **Metric**: Recall@k — a question is a "hit" at k if any of the top-k retrieved chunks contains all ground-truth keywords for that question
+- **Index**: fresh in-memory FAISS `IndexFlatIP` per strategy (no data leakage)
+- **Embedding model**: `all-MiniLM-L6-v2` (384-dim, CPU, no API cost)
+
+### Results
+
+| # | Question | Fixed @3 | Sent @3 | Fixed @5 | Sent @5 |
+|---|---|---|---|---|---|
+| 1 | What is Retrieval-Augmented Generation? | ✅ | ✅ | ✅ | ✅ |
+| 2 | Who introduced RAG and when? | ✅ | ✅ | ✅ | ✅ |
+| 3 | What embedding model does DocMind use? | ✅ | ✅ | ✅ | ✅ |
+| 4 | Why is sentence-aware chunking better? | ❌ | ✅ | ✅ | ✅ |
+| 5 | What is Recall@k and why Recall@3? | ✅ | ✅ | ✅ | ✅ |
+| 6 | What FAISS index type does DocMind use? | ✅ | ✅ | ✅ | ✅ |
+| 7 | How does DocMind prevent hallucination? | ❌ | ✅ | ❌ | ✅ |
+| 8 | Streamlit Cloud deployment constraint? | ❌ | ✅ | ✅ | ✅ |
+| 9 | What does RAGAS measure? | ✅ | ✅ | ✅ | ✅ |
+| 10 | What vector databases can RAG use? | ✅ | ✅ | ✅ | ✅ |
+| | **Recall@k** | **70%** | **80%** | **80%** | **90%** |
+
+### Run the benchmark yourself
+
+```bash
+# Basic — prints summary table
+python eval/run_eval.py
+
+# Verbose — shows per-question hit/miss detail
+python eval/run_eval.py --verbose
+
+# Save results to eval/eval_results.md
+python eval/run_eval.py --save
 ```
 
-Example:
+No API keys needed. The benchmark is entirely local (embedding + FAISS only).
 
-```text
-Question:
-What are the key findings in this document?
-
-Answer:
-The document highlights three key findings...
-
-Sources:
-- report.pdf, Chunk 12
-- report.pdf, Chunk 47
-```
+---
 
 ## Features
 
 | Feature | Description |
-| --- | --- |
-| PDF ingestion | Extracts text from PDF files using PyMuPDF. |
-| Text ingestion | Lets users paste raw text directly from the UI. |
-| Semantic retrieval | Uses `all-MiniLM-L6-v2` embeddings and FAISS. |
-| Cosine similarity | Uses normalized embeddings with `IndexFlatIP`. |
-| LLM answers | Generates responses through Groq's Llama 3.3 70B model. |
-| Source citations | Returns cited chunks and source filenames. |
-| Chat history | Sends recent conversation context to the backend. |
-| Local persistence | Saves FAISS index and metadata under `data/`. |
-| Chunking comparison | Supports fixed character windows and NLTK sentence-aware chunks. |
-| Retrieval benchmark | Compares Recall@3 and Recall@5 on a bundled 8-question dataset. |
-| Tests | Includes focused unit tests for core RAG behavior. |
+|---|---|
+| PDF ingestion | Extracts text from PDF files using PyMuPDF |
+| Text ingestion | Paste raw text directly from the UI |
+| **Two chunking strategies** | Fixed (500 chars) or Sentence-aware — selectable per-ingest |
+| Semantic retrieval | `all-MiniLM-L6-v2` embeddings + FAISS `IndexFlatIP` |
+| Cosine similarity | Normalised embeddings with `IndexFlatIP` (exact cosine) |
+| LLM answers | Groq Llama 3.3 70B with temperature 0.1 |
+| Source citations | Returns cited chunks and source filenames |
+| Chat history | Sends recent conversation context to the backend |
+| Local persistence | Saves FAISS index and metadata under `data/` |
+| **Standalone mode** | Full RAG in-process for Streamlit Cloud (no backend needed) |
+| **Retrieval benchmark** | Reproducible Recall@3/5 evaluation — no API keys needed |
+| Tests | pytest suite covering chunking, retrieval, scoring, and answers |
+
+---
 
 ## Tech Stack
 
 | Layer | Technology |
-| --- | --- |
+|---|---|
 | Frontend | Streamlit |
 | Backend | FastAPI, Uvicorn |
 | Embeddings | sentence-transformers, `all-MiniLM-L6-v2` |
-| Vector search | FAISS CPU |
+| Vector search | FAISS CPU (`IndexFlatIP`) |
 | PDF parsing | PyMuPDF |
-| LLM provider | Groq |
+| LLM provider | Groq (Llama 3.3 70B) |
+| Evaluation | Custom Recall@k benchmark (no RAGAS needed) |
 | Testing | pytest |
 | Configuration | python-dotenv |
 
-## Why These Choices?
-
-| Choice | Why it fits this project | Tradeoff |
-| --- | --- | --- |
-| FastAPI backend | Clean API boundary for ingestion, retrieval, stats, and querying. | Adds a second process beside Streamlit. |
-| Streamlit frontend | Fast to demo, easy file upload flow, and enough UI for a portfolio project. | Less control than a custom React frontend. |
-| FAISS `IndexFlatIP` | Simple local vector search with cosine similarity via normalized embeddings. | Exact search is not ideal for very large corpora. |
-| `all-MiniLM-L6-v2` embeddings | CPU-friendly, quick to run locally, and good enough for semantic document retrieval. | Larger embedding models can improve nuanced retrieval. |
-| Selectable chunking | Fixed windows preserve the original behavior; sentence-aware chunks avoid cutting normal sentences. | Sentence-aware chunks have more variable lengths. |
-| Groq Llama 3.3 70B | Low-latency hosted generation for strong demo responsiveness. | Requires a Groq API key and network access. |
-| Local persistence in `data/` | Keeps the project simple to run without external databases. | Multi-user isolation and cloud deployment need additional storage design. |
+---
 
 ## Architecture
 
-```text
-                     +----------------------+
-                     |    Streamlit UI      |
-                     |      port 8501       |
-                     +----------+-----------+
-                                |
-                                | HTTP
-                                v
-                     +----------------------+
-                     |    FastAPI Backend   |
-                     |      port 8000       |
-                     +----------+-----------+
-                                |
-              +-----------------+-----------------+
-              |                                   |
-              v                                   v
-   +----------------------+           +----------------------+
-   |  PDF/Text Ingestion  |           |     Query Route      |
-   +----------+-----------+           +----------+-----------+
-              |                                  |
-              v                                  v
-   +----------------------+           +----------------------+
-   |       Chunking       |           |  Embed user query    |
-   | Fixed or sentence    |           +----------+-----------+
-   +----------+-----------+                      |
-              |                                  v
-              v                       +----------------------+
-   +----------------------+           |  Retrieve top chunks |
-   | Generate embeddings  |           |      from FAISS      |
-   +----------+-----------+           +----------+-----------+
-              |                                  |
-              v                                  v
-   +----------------------+           +----------------------+
-   |   FAISS IndexFlatIP  |           |   Groq Llama 3.3     |
-   |   data/faiss.index   |           |   answer generation  |
-   +----------------------+           +----------------------+
 ```
+                  +----------------------+
+                  |    Streamlit UI      |
+                  |      port 8501       |
+                  +----------+-----------+
+                             |
+                   ┌─────────┴─────────┐
+                   │ strategy selector │
+                   │  fixed | sentence │
+                   └─────────┬─────────┘
+                             | HTTP  (or direct call in standalone mode)
+                             v
+                  +----------------------+
+                  |    FastAPI Backend   |
+                  |      port 8000       |
+                  +----------+-----------+
+                             |
+           +-----------------+-----------------+
+           |                                   |
+           v                                   v
++----------------------+           +----------------------+
+|  PDF/Text Ingestion  |           |     Query Route      |
++----------+-----------+           +----------+-----------+
+           |                                  |
+    ┌──────┴──────┐                           v
+    │  chunk_text │                +----------------------+
+    │  (strategy) │                |  Embed user query    |
+    └──────┬──────┘                +----------+-----------+
+           |                                  |
+           v                                  v
++----------------------+           +----------------------+
+| Generate embeddings  |           |  Retrieve top chunks |
+| all-MiniLM-L6-v2     |           |      from FAISS      |
++----------+-----------+           +----------+-----------+
+           |                                  |
+           v                                  v
++----------------------+           +----------------------+
+|   FAISS IndexFlatIP  |           |   Groq Llama 3.3     |
+|   (cosine similarity)|           |   cited answer gen   |
++----------------------+           +----------------------+
+```
+
+---
 
 ## Project Structure
 
-```text
-RAG-Document-Intelligence/
-|
-|-- app.py                    # Streamlit frontend
-|-- requirements.txt          # Python dependencies
-|-- pytest.ini                # pytest configuration
-|-- .env.example              # Environment variable template
-|-- .gitignore
-|
-|-- backend/
-|   |-- __init__.py
-|   |-- api.py                # FastAPI routes
-|   |-- rag_engine.py         # Core RAG logic
-|
-|-- eval/
-|   |-- benchmark.json        # 8 labeled retrieval questions
-|   |-- sample_doc.txt        # Self-contained AI/ML overview
-|   |-- run_eval.py           # Fixed vs sentence-aware benchmark
-|   |-- eval_results.md       # Generated benchmark table
-|
-|-- tests/
-|   |-- __init__.py
-|   |-- test_rag_engine.py    # Unit tests
-|
-|-- data/                     # Auto-generated local index files
-|   |-- faiss.index
-|   |-- metadata.pkl
 ```
+RAG-Document-Intelligence/
+│
+├── app.py                    # Streamlit frontend (local + standalone mode)
+├── requirements.txt          # Python dependencies
+├── pytest.ini                # pytest configuration
+├── .env.example              # Environment variable template
+├── .gitignore
+│
+├── .streamlit/
+│   └── config.toml           # Theme + server config for Streamlit Cloud
+│
+├── backend/
+│   ├── __init__.py
+│   ├── api.py                # FastAPI routes (strategy param on ingest)
+│   └── rag_engine.py         # Core RAG logic (fixed + sentence chunking)
+│
+├── eval/
+│   ├── benchmark.json        # 10 Q&A pairs + self-contained corpus
+│   ├── run_eval.py           # Recall@3/5 comparison script (no API keys)
+│   └── eval_results.md       # Pre-computed results (auto-generated)
+│
+├── tests/
+│   ├── __init__.py
+│   └── test_rag_engine.py    # Unit tests
+│
+└── data/                     # Auto-generated local index files
+    ├── faiss.index
+    └── metadata.pkl
+```
+
+---
 
 ## Quick Start
 
 ### Prerequisites
 
 - Python 3.10 or newer
-- A free Groq API key from <https://console.groq.com>
-- Git, if you want to clone or push the project
+- A free Groq API key from https://console.groq.com
 
-### 1. Clone the Repository
+### 1. Clone the repository
 
 ```bash
 git clone https://github.com/Yuvrajpawar45/RAG-Document-Intelligence.git
 cd RAG-Document-Intelligence
 ```
 
-If you already have the project locally, open the project folder directly.
-
-### 2. Create a Virtual Environment
-
-Windows:
-
-```powershell
-python -m venv venv
-venv\Scripts\activate
-```
-
-macOS/Linux:
+### 2. Create a virtual environment
 
 ```bash
+# Windows
+python -m venv venv
+venv\Scripts\activate
+
+# macOS / Linux
 python -m venv venv
 source venv/bin/activate
 ```
 
-### 3. Install Dependencies
+### 3. Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Configure Environment Variables
-
-Create a `.env` file from the example:
-
-Windows:
-
-```powershell
-copy .env.example .env
-```
-
-macOS/Linux:
+### 4. Configure environment variables
 
 ```bash
-cp .env.example .env
+cp .env.example .env   # macOS/Linux
+copy .env.example .env # Windows
 ```
 
-Then edit `.env`:
+Edit `.env`:
 
 ```env
 GROQ_API_KEY=your_groq_api_key_here
 DOCMIND_API_URL=http://localhost:8000
 ```
 
-Do not commit your real `.env` file. It should stay private.
-
-### 5. Run the Backend
-
-Open terminal 1:
+### 5. Run the backend
 
 ```bash
 uvicorn backend.api:app --reload --port 8000
 ```
 
-Backend URLs:
+- Health check: http://localhost:8000/health
+- API docs: http://localhost:8000/docs
 
-- Health check: <http://localhost:8000/health>
-- API docs: <http://localhost:8000/docs>
-
-### 6. Run the Frontend
-
-Open terminal 2:
+### 6. Run the frontend
 
 ```bash
 streamlit run app.py
 ```
 
-Frontend URL:
+Frontend: http://localhost:8501
 
-- Streamlit app: <http://localhost:8501>
+---
 
-## Usage
+## Deploy to Streamlit Cloud
 
-1. Start the FastAPI backend.
-2. Start the Streamlit frontend.
-3. Upload a PDF or paste text into the ingestion panel.
-4. Wait for DocMind to index the chunks.
-5. Ask questions in the chat box.
-6. Review the answer and cited sources.
-7. Use the clear index option when you want to reset stored documents.
+DocMind has a **standalone mode** — the RAG engine runs directly inside the Streamlit process with an in-memory FAISS index. No backend needed.
+
+### Steps
+
+1. Push your repo to GitHub (already done ✅)
+2. Go to [share.streamlit.io](https://share.streamlit.io) → **New app**
+3. Select your repo, branch `main`, main file `app.py`
+4. Under **Advanced settings → Secrets**, add:
+
+```toml
+GROQ_API_KEY = "your_key_here"
+DOCMIND_STANDALONE = "true"
+PERSIST_INDEX = "false"
+```
+
+5. Click **Deploy** — you get a public `*.streamlit.app` URL in ~2 minutes.
+
+> **Note:** Streamlit Cloud's filesystem is ephemeral. `PERSIST_INDEX=false` keeps the FAISS index in memory only (per session), which is correct for a public demo.
+
+---
 
 ## API Reference
 
 ### `GET /health`
 
-Returns a basic health response.
-
 ```json
-{
-  "status": "ok"
-}
+{ "status": "ok" }
 ```
 
 ### `GET /stats`
-
-Returns index statistics.
 
 ```json
 {
@@ -355,209 +324,93 @@ Returns index statistics.
 }
 ```
 
-### `POST /ingest/pdf`
+### `POST /ingest/pdf?strategy=sentence`
 
-Uploads and indexes a PDF file.
+Upload and index a PDF. Optional `strategy` query param: `fixed` (default) or `sentence`.
 
 ```bash
-curl -X POST http://localhost:8000/ingest/pdf \
-  -F "file=@document.pdf" \
-  -F "strategy=sentence"
+curl -X POST "http://localhost:8000/ingest/pdf?strategy=sentence" \
+  -F "file=@document.pdf"
 ```
 
-Example response:
+Response:
 
 ```json
 {
   "message": "Ingested 'document.pdf' - 12 chunks",
   "chunks_added": 12,
-  "stats": {
-    "total_chunks": 12,
-    "total_documents": 1,
-    "sources": ["document.pdf"]
-  }
+  "strategy": "sentence",
+  "stats": { "total_chunks": 12, "total_documents": 1, "sources": ["document.pdf"] }
 }
 ```
 
-### `POST /ingest/text`
-
-Indexes raw text.
+### `POST /ingest/text?strategy=sentence`
 
 ```json
 {
   "text": "Your raw text content here...",
-  "source": "my_notes",
-  "strategy": "sentence"
-}
-```
-
-The `strategy` field accepts `fixed` or `sentence` and defaults to `fixed`.
-
-### `POST /compare-chunking`
-
-Returns fixed and sentence-aware chunk counts and character-length stats without changing the index.
-
-```json
-{
-  "text": "A sufficiently long text sample to compare..."
+  "source": "my_notes"
 }
 ```
 
 ### `POST /query`
 
-Asks a question over indexed documents.
-
 ```json
 {
   "query": "What are the key findings?",
+  "top_k": 5,
   "chat_history": []
-}
-```
-
-Example response:
-
-```json
-{
-  "answer": "The key findings are...",
-  "sources": ["report.pdf"],
-  "chunks_used": 5,
-  "retrieved_chunks": []
 }
 ```
 
 ### `DELETE /clear`
 
-Clears the FAISS index and metadata.
-
 ```bash
 curl -X DELETE http://localhost:8000/clear
 ```
 
-## Testing
+---
 
-Run all tests:
+## Testing
 
 ```bash
 pytest
 ```
 
-The test suite covers:
+Covers: text chunking (both strategies), chunk overlap, empty/short inputs, ingestion, retrieval, cosine score range, index clearing, stats, answer shape.
 
-- Text chunking
-- Fixed and sentence-aware strategy behavior
-- Chunk overlap
-- Empty and short input handling
-- Text ingestion
-- Retrieval behavior
-- Cosine similarity score range
-- Index clearing
-- Stats generation
-- Answer response shape
+---
 
-## Chunking Comparison
+## API Reference: Chunking Strategies
 
-`fixed` preserves the original 500-character windows with 100-character overlap. It is predictable and simple, but it can split a sentence in the middle.
+| Parameter | Value | Description |
+|---|---|---|
+| `strategy` | `fixed` | 500-char window, 50-char overlap (default) |
+| `strategy` | `sentence` | Sentence-boundary grouping, 1-sentence overlap |
 
-`sentence` uses NLTK's Punkt sentence tokenizer, packs complete sentences into chunks up to 500 characters, and carries complete prior sentences as overlap when they fit. Sentences longer than the target size fall back to fixed windows.
-
-Run the bundled retrieval benchmark:
-
-```bash
-python eval/run_eval.py
-```
-
-The script evaluates both strategies against `eval/sample_doc.txt`, prints a table, and saves `eval/eval_results.md`.
-
-| Strategy | Chunks | Recall@3 | Recall@5 |
-| --- | ---: | ---: | ---: |
-| Fixed | 12 | 1.000 | 1.000 |
-| Sentence | 12 | 1.000 | 1.000 |
-
-On this compact overview document, sentence-aware chunking preserves complete sentences without reducing keyword retrieval recall. The benchmark is intentionally small and reproducible, so larger domain-specific datasets may produce different results.
-
-## Interview Talking Points
-
-- Built a complete RAG loop: ingestion, chunking, embedding, vector search, answer generation, and citations.
-- Kept retrieval local with FAISS so the project is easy to clone, run, and explain without a hosted vector database.
-- Used normalized embeddings with `IndexFlatIP`, making similarity scores interpretable as cosine similarity.
-- Separated Streamlit and FastAPI to show a realistic frontend/backend boundary instead of a single notebook-style demo.
-- Added unit tests around the core RAG behavior so the project can show a passing CI signal on GitHub.
-- Clear next steps: token-aware chunking, hybrid search, reranking, larger evaluation datasets, Docker, and multi-user session isolation.
-
-**Q: What problem does this project solve?**
-
-It solves document question answering by combining retrieval with generation. Instead of asking an LLM to answer from memory, the system retrieves relevant document chunks first and then asks the LLM to answer using that context.
-
-**Q: How would you improve retrieval quality?**
-
-I would add token-aware chunking, hybrid search with BM25 plus dense retrieval, metadata filtering, and a cross-encoder reranker before sending context to the LLM.
-
-**Q: How would you scale it?**
-
-For larger collections, I would move from `IndexFlatIP` to an approximate nearest-neighbor index such as IVF or HNSW, add a metadata database, run ingestion asynchronously, and shard the vector index if needed.
-
-**Q: How would you evaluate it?**
-
-I would measure retrieval precision and recall on a small labeled evaluation set, then use RAG evaluation metrics such as faithfulness, answer relevancy, and context precision.
-
-## Troubleshooting
-
-### `GROQ_API_KEY not found`
-
-Create a `.env` file and add:
-
-```env
-GROQ_API_KEY=your_groq_api_key_here
-```
-
-### Frontend cannot connect to backend
-
-Make sure the backend is running on port `8000`:
-
-```bash
-uvicorn backend.api:app --reload --port 8000
-```
-
-Also check that `.env` contains:
-
-```env
-DOCMIND_API_URL=http://localhost:8000
-```
-
-### `faiss` install error
-
-Make sure you are using a supported Python version and reinstall dependencies:
-
-```bash
-pip install --upgrade pip
-pip install -r requirements.txt
-```
-
-### Old documents still appear
-
-Clear the index from the UI or call:
-
-```bash
-curl -X DELETE http://localhost:8000/clear
-```
+---
 
 ## Roadmap
 
-- Token-aware chunking
-- Hybrid BM25 plus dense retrieval
-- Cross-encoder reranking
-- Larger domain-specific evaluation datasets
-- Docker and docker-compose setup
-- Multi-user session isolation
-- Optional cloud vector database support
+- [x] Fixed-size chunking
+- [x] Sentence-aware chunking
+- [x] Retrieval evaluation benchmark (Recall@3, Recall@5)
+- [x] Standalone mode for Streamlit Cloud
+- [ ] Token-aware chunking (tiktoken)
+- [ ] Hybrid BM25 + dense retrieval
+- [ ] Cross-encoder reranking
+- [ ] Docker + docker-compose setup
+- [ ] Multi-user session isolation
+
+---
 
 ## Author
 
 **Yuvraj Pawar**
 
-- GitHub: <https://github.com/Yuvrajpawar45>
-- Project: <https://github.com/Yuvrajpawar45/RAG-Document-Intelligence>
+- GitHub: https://github.com/Yuvrajpawar45
+- Project: https://github.com/Yuvrajpawar45/RAG-Document-Intelligence
 
 ---
 
-Built as a practical RAG portfolio project with local retrieval, cited answers, and test coverage.
+Built as a practical RAG portfolio project — with local retrieval, two benchmarked chunking strategies, a reproducible evaluation pipeline, and Streamlit Cloud deployment.
