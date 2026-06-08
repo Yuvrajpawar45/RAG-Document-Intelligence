@@ -1,14 +1,13 @@
---prefer-binary
 streamlit==1.58.0
 pillow==12.2.0
 sentence-transformers==3.0.1
-faiss-cpu==1.8.0
+faiss-cpu==1.14.2
 numpy==1.26.4
-groq==0.9.0
+pymupdf==1.25.5
 fastapi==0.111.0
 uvicorn[standard]==0.30.1
 python-multipart==0.0.9
 pydantic==2.7.4
+groq==0.9.0
 python-dotenv==1.0.1
 requests==2.32.3
-pymupdf==1.25.5
