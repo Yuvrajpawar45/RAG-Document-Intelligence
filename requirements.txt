@@ -1,11 +1,11 @@
-streamlit==1.58.0
-pillow==12.2.0
+streamlit==1.45.1
+pillow==11.2.1
 sentence-transformers==3.0.1
-faiss-cpu==1.14.2
+faiss-cpu==1.9.0
 pymupdf==1.25.5
-fastapi==0.111.0
-uvicorn[standard]==0.30.1
-python-multipart==0.0.26
+fastapi==0.115.12
+uvicorn[standard]==0.34.2
+python-multipart==0.0.20
 pydantic==2.7.4
 groq==0.9.0
 python-dotenv==1.0.1
