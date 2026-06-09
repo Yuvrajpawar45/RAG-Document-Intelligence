@@ -1,7 +1,7 @@
 streamlit==1.45.1
-pillow==11.2.1
+pillow==11.3.0
 sentence-transformers==3.0.1
-faiss-cpu==1.9.0
+faiss-cpu==1.14.2
 pymupdf==1.25.5
 fastapi==0.115.12
 uvicorn[standard]==0.34.2
