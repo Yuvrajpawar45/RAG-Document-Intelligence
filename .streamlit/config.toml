@@ -12,14 +12,4 @@ enableCORS = false
 port = 8501
 
 [browser]
-gatherUsageStats = false 
-
-
-[server]
-enableStaticServing = false
-
-[runner]
-enforceSerializableSessionState = false
-
-[client]
-showErrorDetails = true
+gatherUsageStats = false
